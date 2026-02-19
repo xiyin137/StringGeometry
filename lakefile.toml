@@ -1,0 +1,11 @@
+name = "StringGeometry"
+version = "0.1.0"
+defaultTargets = ["StringGeometry"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "master"
+
+[[lean_lib]]
+name = "StringGeometry"
