@@ -217,15 +217,16 @@ This is the "odd cotangent bundle" - its sections are the odd 1-forms.
     - Fiber dimension (0|q): purely odd fibers of dimension q
     - The fibers are the "odd cotangent spaces" T*_x^{odd}M
 
-    Sections of E* correspond to the "soul linear" part of superfunctions. -/
+    Sections of E* correspond to the "soul linear" part of superfunctions.
+
+    **Note on J/J² correspondence**: The fibers of this bundle should be identified
+    with the stalks of J/J², where J is the nilpotent ideal. This identification
+    requires sheaf stalk infrastructure (germs, quotient stalks) which is not yet
+    formalized. The mathematical content is: sections of E* over U biject with
+    elements of J(U)/J²(U) that are linear in the odd generators. -/
 structure OddCotangentBundle {dim : SuperDimension} (M : Supermanifold dim) where
   /-- E* as a super vector bundle with purely odd fibers -/
   bundle : SuperVectorBundle M ⟨0, dim.odd⟩
-  /-- The projection maps fibers to the quotient J/J² -/
-  isQuotient : ∀ (x : M.body) (U : Set M.body) (hU : IsOpen U) (hxU : x ∈ U)
-    (J : NilpotentIdeal M),
-    -- There's a correspondence between fiber elements and germs of J/J²
-    True  -- The fiber at x represents (J/J²)_x
 
 /-- Construct the odd cotangent bundle from a supermanifold.
 
@@ -254,7 +255,6 @@ def mkOddCotangentBundle {dim : SuperDimension} (M : Supermanifold dim) :
       }, fun e => rfl⟩
     transitionsPreserveGrading := SuperFiber.preservesGrading_trans
   }
-  isQuotient := fun _ _ _ _ _ => trivial
 
 /-!
 ## Split Supermanifolds
@@ -275,27 +275,40 @@ exterior algebra of a vector bundle over the body.
 structure SplitSupermanifold (dim : SuperDimension) extends Supermanifold dim where
   /-- The vector bundle E → M_red whose exterior algebra gives the structure sheaf -/
   splittingBundle : SuperVectorBundle toSupermanifold ⟨dim.odd, 0⟩
-  /-- For each open U, there's a ring isomorphism O(U) ≅ C^∞(U) ⊗ ∧•ℝ^q -/
+  /-- For each open U, a specific ring isomorphism O(U) ≅ C^∞(U) ⊗ ∧•ℝ^q.
+      We provide the actual isomorphism (not just existence) so that
+      compatibility with restriction can be stated. -/
   sheafIso : ∀ (U : Set body) (hU : IsOpen U),
-    Nonempty ((structureSheaf U hU).carrier ≃+*
-      SuperDomainFunction dim.even dim.odd)
-  /-- The isomorphism is compatible with restriction -/
-  iso_compatible : ∀ (U V : Set body) (hU : IsOpen U) (hV : IsOpen V) (hVU : V ⊆ U),
-    ∀ s : (structureSheaf U hU).carrier,
-      True -- The isomorphisms commute with restriction
-      -- Full formalization: sheafIso V hV (restriction s) = restrict (sheafIso U hU s)
+    (structureSheaf U hU).carrier ≃+* SuperDomainFunction dim.even dim.odd
+  /-- The isomorphisms are compatible with restriction.
 
-/-- The obstruction to splitting lies in a cohomology group.
+      For V ⊆ U, the following diagram commutes:
+        O(U) --iso_U--> SuperDomainFunction
+         |                    |
+        res_{U,V}          res_{U,V}
+         |                    |
+        O(V) --iso_V--> SuperDomainFunction
 
-    For a smooth supermanifold, this obstruction vanishes due to the
-    existence of smooth partitions of unity.
+      Since SuperDomainFunction coefficients are global smooth functions ℝ^p → ℝ,
+      "restriction" on the SuperDomainFunction side is the identity on coefficients
+      (the functions don't change, only the domain of relevance shrinks).
+      Therefore compatibility means: iso_V (res s) = iso_U s as SuperDomainFunctions. -/
+  iso_compatible : ∀ (U V : Set body) (hU : IsOpen U) (hV : IsOpen V) (hVU : V ⊆ U)
+    (s : (structureSheaf U hU).carrier),
+      sheafIso V hV (toSupermanifold.restriction U V hU hV hVU s) =
+      sheafIso U hU s
 
-    For a complex supermanifold, this obstruction can be non-trivial.
-    The Donagi-Witten theorem shows it is non-trivial for 𝔐_g when g ≥ 5. -/
+/-- Placeholder type for the splitting obstruction.
+
+    The correct type is H¹(M_red, Hom(Sym²E*, TM_red)) where E* = J/J².
+    This requires sheaf cohomology (Čech or derived functor) which is not
+    yet formalized. When this infrastructure is available, replace `Unit`
+    with the proper cohomology group.
+
+    For smooth supermanifolds, the obstruction vanishes (Batchelor's theorem).
+    For complex supermanifolds, it can be non-trivial (Donagi-Witten). -/
 def splittingObstruction {dim : SuperDimension} (M : Supermanifold dim) : Type :=
-  -- H¹(M_red, Hom(Sym²E*, TM_red)) where E* = J/J²
-  -- This requires sheaf cohomology machinery
-  Unit  -- Placeholder: full definition requires Čech or derived functor cohomology
+  Unit
 
 /-- The splitting data packages the vector bundle E and the isomorphism O_M ≅ ∧•E*. -/
 structure SplittingData {dim : SuperDimension} (M : Supermanifold dim) where
@@ -353,29 +366,31 @@ theorem batchelor_splitting {dim : SuperDimension} (M : Supermanifold dim) :
     which is the space of "twists" of the splitting.
 
     This theorem states that given two splittings of the same supermanifold,
-    they differ by an automorphism of the exterior algebra structure.
+    they differ by a family of grading-preserving ring automorphisms that
+    intertwines the two sheaf isomorphisms.
 
     **Proper statement**: For any two splittings S₁ and S₂, there exists a
     family of ring automorphisms (one for each open set) that transforms
     S₁.sheafIso into S₂.sheafIso, preserving the grading. -/
 theorem splitting_nonuniqueness {dim : SuperDimension} (M : Supermanifold dim)
     (S₁ S₂ : SplittingData M) :
-    -- For each open U, there exists an automorphism relating the two sheaf isos
+    -- For each open U, there exists a grading-preserving automorphism
+    -- that intertwines the two sheaf isomorphisms
     ∀ (U : Set M.body) (hU : IsOpen U),
       ∃ (φ : SuperDomainFunction dim.even dim.odd ≃+* SuperDomainFunction dim.even dim.odd),
         -- φ preserves the grading (maps even to even, odd to odd)
         (∀ f, f.isEven → (φ f).isEven) ∧
-        (∀ f, f.isOdd → (φ f).isOdd) := by
+        (∀ f, f.isOdd → (φ f).isOdd) ∧
+        -- φ intertwines the two isomorphisms:
+        -- for any iso₁ from S₁ and iso₂ from S₂, iso₂ = φ ∘ iso₁
+        (∀ (iso₁ : (M.structureSheaf U hU).carrier ≃+* SuperDomainFunction dim.even dim.odd)
+           (iso₂ : (M.structureSheaf U hU).carrier ≃+* SuperDomainFunction dim.even dim.odd),
+           (S₁.sheafIso U hU).some = iso₁ → (S₂.sheafIso U hU).some = iso₂ →
+           ∀ s, iso₂ s = φ (iso₁ s)) := by
   -- The proof requires:
   -- 1. Analyzing how different splittings arise from different trivializations
-  -- 2. Showing the difference is captured by a grading-preserving automorphism
-  -- 3. The automorphism space is H⁰(M_red, Hom(E*, Sym²E* ⊗ TM_red))
-  intro U hU
-  -- Identity automorphism always works (but the interesting content is
-  -- that ALL differences are of this form)
-  use RingEquiv.refl _
-  constructor
-  · intro f hf; exact hf
-  · intro f hf; exact hf
+  -- 2. The difference φ = iso₂ ∘ iso₁⁻¹ is a grading-preserving automorphism
+  -- 3. The space of such φ is H⁰(M_red, Aut_gr(∧•E*))
+  sorry
 
 end Supermanifolds

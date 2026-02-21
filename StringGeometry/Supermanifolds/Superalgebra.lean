@@ -949,8 +949,11 @@ structure ExteriorGrassmannAlgebra (R : Type*) [CommRing R] (V : Type*) [AddComm
 /-- Standard exterior algebra ∧•ℝⁿ with n generators θ¹, ..., θⁿ -/
 def standardExteriorAlgebra (n : ℕ) : Type := ExteriorAlgebra ℝ (Fin n → ℝ)
 
-/-- Dimension of ∧•ℝⁿ is 2ⁿ -/
-theorem exterior_algebra_dim (n : ℕ) : 2^n = 2^n := rfl  -- placeholder for actual dimension theorem
+/-- The number of basis elements (multi-indices) for the Grassmann algebra with n generators
+    is 2ⁿ. This follows from the fact that `Finset (Fin n)` (subsets of {0,...,n-1})
+    has cardinality 2ⁿ, which indexes the Grassmann monomials θ^I. -/
+theorem grassmann_basis_card (n : ℕ) : Fintype.card (Finset (Fin n)) = 2 ^ n := by
+  rw [Fintype.card_finset, Fintype.card_fin]
 
 /-- A superderivation of parity p on a superalgebra A is an R-linear map D : A → A
     satisfying the graded Leibniz rule:

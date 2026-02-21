@@ -75,6 +75,16 @@ The smoothness of (f ∘ φ) in x follows from:
 
 MEDIUM-HIGH. The mathematical content is clear but coefficient tracking is combinatorially complex. The key challenge is expressing multi-variable Taylor expansion over the Grassmann algebra in Lean's type system.
 
+## IMPORTANT: Commutative Ring, Not Field
+
+The even part of FiniteGrassmannCarrier q is a commutative ring with ZERO DIVISORS.
+This means:
+- Taylor 1/n! factor MUST be ℝ-scalar multiplication: `((n.factorial : ℝ)⁻¹) • (...)`
+- NEVER use division within the Grassmann algebra
+- Products δ_{k₁} · ... · δ_{k_n} are computed in the Grassmann ring
+- When all δ_k are even (from even coordinates), they commute → order doesn't matter
+- The FPS infrastructure (expNilpotent, logOneSubNilpotent) uses `Algebra ℚ R` correctly
+
 ## Simplification for Phase 2
 
 For the pullback formula, we actually only need the **value** of (f ∘ φ) at each point x (as a Grassmann algebra element), not the full SuperDomainFunction decomposition. This means we can implement:

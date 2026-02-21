@@ -5,6 +5,7 @@ import StringGeometry.Supermanifolds.Helpers.Helpers
 import StringGeometry.Supermanifolds.Helpers.GradedRings
 import StringGeometry.Supermanifolds.Helpers.OddDerivations
 import StringGeometry.Supermanifolds.Helpers.BerezinianMul
+import StringGeometry.Supermanifolds.Integration.StokesTheorem
 
 /-!
 # Supermanifolds Module

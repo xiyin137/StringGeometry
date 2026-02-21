@@ -85,3 +85,47 @@ When proving cocycle conditions:
 - For full Berezinian: Need `SuperMatrix.ber_mul` with invertibility hypotheses
 
 See Deligne-Morgan "Notes on Supersymmetry" for rigorous treatment of supermatrices.
+
+## Grassmann Algebra: Commutative Ring, NOT a Field
+
+**Critical distinction**: The even part of the Grassmann algebra Λ_q is a **commutative ring** with
+**zero divisors**, NOT a field. This has several important consequences:
+
+### Zero Divisors
+- Example in Λ₂: θ₁θ₂ · θ₁θ₂ = 0, but θ₁θ₂ ≠ 0
+- Even elements like θ₁θ₂ ∈ Λ₂^even can be zero divisors
+- Products of soul elements can vanish even when neither factor is zero
+
+### Division is Not Available
+- `FiniteGrassmannCarrier q` has no `Field` instance
+- NEVER use `(x : FiniteGrassmannCarrier q)⁻¹` or division within the Grassmann algebra
+- Taylor coefficients 1/n! must be **ℝ-scalar multiplication**: `((n.factorial : ℝ)⁻¹) • (...)`
+- The `FPSLogExp` infrastructure handles this correctly via `Algebra ℚ R` (rational scalar action)
+
+### Invertibility Requires Nonzero Body
+- An element `a ∈ FiniteGrassmannCarrier q` is invertible iff `grassmannBody a ≠ 0`
+- The inverse is constructed via: `a⁻¹ = (body a)⁻¹ · (1 + (body a)⁻¹ · soul a)⁻¹`
+- The second factor uses the geometric series `(1 + ε)⁻¹ = Σ (-ε)^n` (terminates by nilpotency)
+- This is analogous to `FPSBasic.invertible_iff_constantTerm_invertible` for formal power series
+
+### Berezinian Invertibility
+- The Berezinian `Ber(J_φ) = det(A - BD⁻¹C) / det(D)` requires:
+  - `det(D)` has **nonzero body** (essential hypothesis, NOT automatic)
+  - `det(A - BD⁻¹C)` has **nonzero body** (for the overall Berezinian to be defined)
+- These are carried as explicit hypotheses in `SuperJacobian.berezinianAt`
+
+### Implications for Taylor Expansion
+- The nilpotent Taylor expansion `f(a + δ) = Σ (1/n!) D^n f(a) · δ^n` uses:
+  - Derivatives `D^n f(a)` evaluated at **real** points → produces ℝ values
+  - Products `δ_{k₁} · ... · δ_{k_n}` computed in the Grassmann **ring** (not field)
+  - Scalar multiplication `(1/n! : ℝ) • (product)` to combine
+- The sum truncates at order q because products of q+1 or more soul elements vanish
+  (by `grassmann_soul_nilpotent` / `hasNoConstant` argument)
+- When δ_k come from **even** coordinate functions, they commute → multinomial formula applies
+- When δ_k are general Grassmann elements, ordering in the product matters
+
+### Connection to Existing FPS Infrastructure
+- `FPSLogExp.expNilpotent` uses `(k.factorial : ℚ)⁻¹ • L^k` — correct ℚ-scalar multiplication
+- `FPSLogExp.logOneSubNilpotent` uses `algebraMap ℚ R (1/(k+1)) * x^(k+1)` — correct rational coefficients
+- Both work over `CommRing R` with `Algebra ℚ R`, applicable to even Grassmann subalgebra
+- For the full Grassmann algebra (not commutative), these results apply to even elements only

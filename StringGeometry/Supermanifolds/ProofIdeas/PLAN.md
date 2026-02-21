@@ -1,5 +1,12 @@
 # Integration Theory and Stokes Theorem on Supermanifolds — Development Plan
 
+## Two-Track Architecture
+
+**Track A (Stokes)**: Codimension-1 forms → exterior derivative → Stokes theorem.
+Does NOT need super function composition. **COMPLETED (Phases 1-2).**
+
+**Track B (Change of Variables)**: Super composition → pullback → change of variables → global integral independence. Needed for completeness.
+
 ## Current State Assessment
 
 ### What's Already Built
@@ -10,17 +17,25 @@ The existing infrastructure is substantial:
 - **IntegralForm**: sections of Berezinian bundle with pullback (placeholder), local/global integration
 - **Super Jacobian**: block structure with proper ℤ/2-grading, chain rule infrastructure
 - **Partition of unity**: structure defined, existence statement requires paracompactness (sorry)
-- **Super Stokes theorem**: skeleton with body-level reduction (trivial proof that defers to body Stokes)
 - **Super divergence**: defined, divergence theorem stated
 
-### Key Gaps
+### ✅ Completed (Track A)
+1. **IntegralFormCodim1** (`Integration/IntegralFormCodim.lean`) — codimension-1 integral forms with zero, add, smul, neg, mulByFunction
+2. **Super exterior derivative** (`Integration/ExteriorDerivative.lean`) — d = d₀ + d₁ on codim-1 forms:
+   - `d0Codim1`: even part (super divergence)
+   - `d1Codim1`: odd part (vanishes after Berezin integration)
+   - `superExteriorDerivativeCodim1`: full d = d₀ + d₁
+3. **Super Stokes theorem** (`Integration/StokesTheorem.lean`) — PROVEN:
+   - `berezin_d1_vanishes`: ∫dθ d₁ν = 0 (fully proven, no sorry)
+   - `d0_commutes_berezin`: d₀ commutes with Berezin integration (fully proven)
+   - `super_stokes_codim1_no_boundary`: ∫ dν = 0 for compact support (fully proven)
+   - `super_stokes_codim1_with_boundary`: ∫_U dν = ∫_{∂U} ν (fully proven)
+
+### Key Remaining Gaps (Track B)
 1. **IntegralForm.pullback** — returns identity (placeholder), needs super function composition + Berezinian multiplication
 2. **SuperDomainFunction.compose** — simplified placeholder, needs full coefficient tracking
-3. **Super exterior derivative** — returns `Unit` (placeholder)
-4. **Integral forms of mixed codimension** — not implemented (needed for proper Stokes)
-5. **Boundary operator for supermanifolds** — not implemented
-6. **Change of variables formula** — statement correct, proof sorry
-7. **Global integral independence** — proof outline documented, sorry
+3. **Change of variables formula** — statement correct, proof sorry
+4. **Global integral independence** — proof outline documented, sorry
 
 ---
 
@@ -273,13 +288,11 @@ Phase 1 is the critical bottleneck — nearly everything else depends on having 
 
 ## Priority Order
 
-1. **Phase 1** — Super function composition (unblocks everything)
-2. **Phase 4** — Super exterior derivative (needed for Stokes, can be started in parallel with Phase 1 using abstract axioms)
+1. ✅ **Phases 3+4+6** — Codim-1 forms, exterior derivative, Stokes theorem (COMPLETED via Track A)
+2. **Phase 1** — Super function composition (unblocks Track B)
 3. **Phase 2** — Pullback (needs Phase 1)
 4. **Phase 5** — Boundary operator (independent of Phase 1, can proceed in parallel)
-5. **Phase 6** — Stokes theorem (needs Phases 4 and 5)
-6. **Phase 3** — Codimension forms (enriches the theory but not strictly needed for basic Stokes)
-7. **Phase 7** — Completing existing sorrys
+5. **Phase 7** — Completing existing sorrys (change of variables, global independence)
 
 ## References
 

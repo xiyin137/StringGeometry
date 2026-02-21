@@ -1176,35 +1176,6 @@ structure SuperCoordinates {dim : SuperDimension} {M : Supermanifold dim}
   /-- Odd coordinates lie in the odd part of the superalgebra -/
   oddCoords_odd : ∀ a, oddCoords a ∈ (M.structureSheaf chart.domain chart.domainOpen).odd
 
-/-- A super atlas on M is a collection of charts covering M_red with
-    compatible transition functions. -/
-structure SuperAtlas {dim : SuperDimension} (M : Supermanifold dim) where
-  /-- Index set for charts -/
-  index : Type*
-  /-- The charts -/
-  charts : index → SuperChart M
-  /-- The charts cover M_red -/
-  covers : ∀ x : M.body, ∃ α, x ∈ (charts α).domain
-  /-- On overlapping domains, there exists a transition isomorphism.
-      For charts α, β with overlap U_α ∩ U_β, we have a ring isomorphism
-      between the super domain functions that is compatible with evaluation. -/
-  transitions_exist : ∀ (α β : index),
-    let U_α := (charts α).domain
-    let U_β := (charts β).domain
-    let overlap := U_α ∩ U_β
-    (overlap.Nonempty) →
-    ∃ (_ : IsOpen overlap),
-    -- There exists a compatible transition (details depend on restriction infrastructure)
-    True
-  /-- The chart isomorphisms are compatible on overlaps:
-      for any point in the overlap, evaluation commutes with transition. -/
-  sheafIso_compatible : ∀ (α β : index),
-    let U_α := (charts α).domain
-    let U_β := (charts β).domain
-    ∀ (x : M.body) (_ : x ∈ U_α) (_ : x ∈ U_β),
-    -- The body coordinates agree: φ_α(x) and φ_β(x) are related by the transition
-    True  -- Coherence: chart changes preserve evaluation
-
 /-!
 ## Change of Coordinates
 
@@ -1257,6 +1228,46 @@ structure SuperTransition {dim : SuperDimension} {M : Supermanifold dim}
   bodyTransition_inv : ∃ (g : (Fin dim.even → ℝ) → (Fin dim.even → ℝ)),
     (∀ x, g ((fun i => (evenTransition i).body x)) = x) ∧
     ContDiff ℝ ⊤ g
+
+/-- A super atlas on M is a collection of charts covering M_red with
+    compatible transition functions.
+
+    The transitions are stored directly (not existentially) so that other
+    fields can reference them. For non-overlapping charts, the transition
+    data is present but unused — the meaningful conditions (body_compatible,
+    cocycle, identity) only constrain overlapping charts. -/
+structure SuperAtlas {dim : SuperDimension} (M : Supermanifold dim) where
+  /-- Index set for charts -/
+  index : Type*
+  /-- The charts -/
+  charts : index → SuperChart M
+  /-- The charts cover M_red -/
+  covers : ∀ x : M.body, ∃ α, x ∈ (charts α).domain
+  /-- Transition functions between charts.
+      T_{αβ} expresses chart β's coordinates in terms of chart α's.
+      Each transition is a `SuperTransition` with proper parity, smoothness,
+      and invertibility (from the `SuperTransition` structure). -/
+  transitions : (α β : index) → SuperTransition (charts α) (charts β)
+  /-- Body compatibility: the body coordinate map of chart β equals the body
+      transition T_{αβ} applied to the body coordinates of chart α.
+      φ_β(p) = body(T_{αβ})(φ_α(p)) for p in the overlap. -/
+  body_compatible : ∀ (α β : index)
+    (x : M.body) (hx_α : x ∈ (charts α).domain) (hx_β : x ∈ (charts β).domain)
+    (i : Fin dim.even),
+      ((charts β).bodyCoord ⟨x, hx_β⟩ : EuclideanSpace ℝ (Fin dim.even)) i =
+      ((transitions α β).evenTransition i).body
+        (fun j => ((charts α).bodyCoord ⟨x, hx_α⟩ : EuclideanSpace ℝ (Fin dim.even)) j)
+  /-- Cocycle condition at body level: body(T_{αγ}) = body(T_{βγ}) ∘ body(T_{αβ}).
+      This ensures the atlas defines a consistent global structure.
+      The full super-level cocycle (with θ-corrections) requires composition
+      infrastructure; the body-level cocycle is the leading-order constraint. -/
+  cocycle : ∀ (α β γ : index) (x : Fin dim.even → ℝ),
+    (fun i => ((transitions α γ).evenTransition i).body x) =
+    (fun i => ((transitions β γ).evenTransition i).body
+      (fun j => ((transitions α β).evenTransition j).body x))
+  /-- Identity: T_{αα} is the identity at body level. -/
+  identity : ∀ (α : index) (x : Fin dim.even → ℝ) (i : Fin dim.even),
+    ((transitions α α).evenTransition i).body x = x i
 
 /-- The cocycle condition for transitions: φ_αγ = φ_βγ ∘ φ_αβ on triple overlaps.
 

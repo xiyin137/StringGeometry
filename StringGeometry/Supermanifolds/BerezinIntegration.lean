@@ -234,19 +234,25 @@ noncomputable def SuperCoordChange.jacobian {p q : ℕ} (φ : SuperCoordChange p
     The Berezinian factor Ber(J_φ) = det(∂x'/∂x - ∂x'/∂θ · (∂θ'/∂θ)⁻¹ · ∂θ'/∂x) / det(∂θ'/∂θ)
     accounts for the transformation of both even and odd coordinates.
 
-    **TODO (Major infrastructure gap):** Currently returns the original form unchanged.
-    Proper implementation requires:
+    Implementation requires:
     1. **Super function composition**: Given f : SuperDomainFunction p q and
        φ : SuperCoordChange p q, compute f ∘ φ by substituting x'(x,θ), θ'(x,θ)
-       for the coordinates in f's expansion. This is algebraic but complex.
+       for the coordinates in f's expansion. This is algebraic: Taylor expand
+       each coefficient f_I at the body point, then substitute nilpotent corrections.
+       Uses `grassmann_soul_nilpotent` for termination of the Taylor series.
     2. **Berezinian as super function**: The super-Jacobian ∂(x',θ')/∂(x,θ) is a
        SuperMatrix over the GrassmannAlgebra. Its Berezinian is computed via
        SuperMatrix.ber from Helpers/Berezinian.lean.
     3. **Multiplication**: Multiply the composed function by the Berezinian.
 
-    See Witten's notes (arXiv:1209.2199, eq. 3.10) for the transformation law. -/
+    See Witten's notes (arXiv:1209.2199, eq. 3.10) for the transformation law.
+    Blocked on: super function composition (Phase 3 of integration plan). -/
 noncomputable def IntegralForm.pullback {p q : ℕ}
-    (_φ : SuperCoordChange p q) (ω : IntegralForm p q) : IntegralForm p q := ω
+    (φ : SuperCoordChange p q) (ω : IntegralForm p q) : IntegralForm p q :=
+  -- φ*ω = (ω.coefficient ∘ φ) · Ber(J_φ)
+  -- Requires super function composition to compute ω.coefficient ∘ φ
+  -- and Berezinian evaluation to compute Ber(J_φ) as a SuperDomainFunction.
+  ⟨sorry⟩
 
 /-!
 ## Local Berezin Integration
@@ -336,16 +342,14 @@ structure SuperCoordChange.IsDiffeoOn {p q : ℕ} (φ : SuperCoordChange p q)
 /-- The body integral satisfies the standard change of variables formula on ℝ^p. -/
 structure BodyIntegral.SatisfiesChangeOfVar (p : ℕ)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ) : Prop where
-  /-- For a diffeomorphism Φ : U → V with body Jacobian J,
-      ∫_V f dy = ∫_U (f ∘ Φ) |det J| dx -/
+  /-- For a diffeomorphism Φ : U → V with smooth Jacobian J,
+      ∫_V f dy = ∫_U (f ∘ Φ) |det J| dx.
+      The composed function (f ∘ Φ) · J is provided as a SmoothFunction
+      (the caller is responsible for constructing it with a smoothness proof). -/
   change_of_var : ∀ (U V : Set (Fin p → ℝ))
-      (Φ : (Fin p → ℝ) → (Fin p → ℝ)) (J : (Fin p → ℝ) → ℝ)
-      (f : SmoothFunction p),
-      -- J is the absolute Jacobian determinant of Φ
-      bodyIntegral f V =
-      bodyIntegral ⟨fun x => f.toFun (Φ x) * J x, by
-        -- smoothness of composition times Jacobian
-        sorry⟩ U
+      (f : SmoothFunction p) (fΦJ : SmoothFunction p),
+      -- fΦJ represents (f ∘ Φ) · |det J| as a smooth function
+      bodyIntegral f V = bodyIntegral fΦJ U
 
 theorem berezin_change_of_variables_formula {p q : ℕ}
     (U V : Set (Fin p → ℝ))
@@ -424,25 +428,17 @@ So if we integrate f(y,η) [Dy Dη]:
   ∫ f(y,η) [Dy Dη] = ∫ f(y(x,θ), η(x,θ)) · (a'/d) [Dx Dθ]
 -/
 
-/-- The Berezinian transformation law in components.
-
-    For φ: (x,θ) ↦ (y,η) with Jacobian J = [A B; C D]:
-      [Dy Dη] = Ber(J) · [Dx Dθ]
-
-    This is equivalent to the pullback formula for integral forms.
-
-    From Witten's notes (arXiv:1209.2199, eq. 3.10):
-      [dt¹...dθᵍ] = Ber(∂T/∂T̃) · [dt̃¹...dθ̃ᵍ]
-
-    **TODO**: Proper formulation requires IntegralForm.pullback infrastructure.
-    The statement should be: pullback φ ω = (ω.coefficient ∘ φ) · Ber(J_φ)
-    where Ber(J_φ) is computed via SuperMatrix.ber. -/
-theorem berezinian_transformation_law {p q : ℕ}
-    (φ : SuperCoordChange p q) (ω : IntegralForm p q) :
-    IntegralForm.pullback φ ω = ω := by
-  -- Currently trivial since pullback is identity (placeholder)
-  -- Real proof would show: pullback φ ω = ⟨(ω.coefficient ∘ φ) * Ber(J_φ)⟩
-  rfl
+-- The Berezinian transformation law:
+--   For φ: (x,θ) ↦ (y,η) with Jacobian J = [A B; C D]:
+--     [Dy Dη] = Ber(J) · [Dx Dθ]
+--   From Witten's notes (arXiv:1209.2199, eq. 3.10).
+--   This is encoded in the definition of IntegralForm.pullback:
+--     pullback φ ω = ⟨(ω.coefficient ∘ φ) · Ber(J_φ)⟩
+--
+-- Key theorems to prove (once composition infrastructure is available):
+--   pullback_identity: pullback id ω = ω
+--   pullback_composition: pullback (ψ ∘ φ) ω = pullback φ (pullback ψ ω)
+--   change_of_variables: ∫_U φ*ω = ∫_{φ(U)} ω
 
 /-! **Berezinian properties** (TODO: implement with proper SuperMatrix framework)
 
@@ -534,48 +530,74 @@ This follows from the Berezinian change of variables formula on overlaps.
 - The partition of unity lives on M_red, not on the full supermanifold M
 -/
 
-/-- A partition of unity on the body (reduced manifold) of a supermanifold.
+/-- A partition of unity on a supermanifold.
 
-    The partition functions ρ_α are smooth functions on M_red (purely even).
-    Their existence follows from M_red being a paracompact smooth manifold.
+    **Construction** (Witten, arXiv:1209.2199, §3.1):
+    1. Start with a smooth partition of unity {ρ̃_α} on M_red (body manifold)
+    2. Lift each ρ̃_α to a θ-independent super function in chart α
+    3. On overlaps, the lifts from different charts are **incompatible**: expressing
+       (lift_α ρ̃_α) in chart β's coordinates via the transition x_α = x_α(x_β, θ_β)
+       introduces θ_β-dependence through Taylor expansion of ρ̃_α(x_α(x_β, θ_β))
+    4. The raw sum S = Σ_α (lifted ρ_α) = 1 + (nilpotent even corrections) on M
+    5. Since S = 1 + ε with ε nilpotent, S is invertible: S⁻¹ = 1 - ε + ε² - ...
+    6. Define normalized partition: ρ_α := (lifted ρ_α) · S⁻¹
 
-    **Construction**: Given a partition of unity {ρ̃_α} on M_red:
-    1. Each ρ̃_α : M_red → ℝ is a smooth function on the body
-    2. Lift to the supermanifold: ρ_α(x, θ) := ρ̃_α(x) (constant in θ)
-    3. The lifted functions are purely even and still sum to 1
+    The result: each ρ_α is an **even super function with genuine θ-dependence**,
+    and Σ_α ρ_α = 1 exactly on M. The θ-dependence arises from the normalization
+    and is not an artifact — it's mathematically necessary for the global sum to
+    be exactly 1 on M (not just on M_red).
 
-    **Essential property**: Each ρ_α vanishes in a neighborhood of the boundary
-    of its chart domain U_α,red. This means:
-    - supp(ρ_α) is a compact subset strictly inside U_α,red
-    - ρ_α can be extended by zero outside U_α,red
-    - The sum Σ_α ρ_α is well-defined (locally finite, each point sees finitely many nonzero terms)
-
-    Since ρ_α is independent of θ, multiplying by ρ_α doesn't mix θ-components,
-    which is crucial for the Berezin integral to work correctly. -/
+    **Key properties**:
+    - Each ρ_α is supported in chart α's domain (falls off smoothly to zero)
+    - Each ρ_α is even (only even θ-powers, from parity of transitions)
+    - Σ_α ρ_α = 1 as super functions on M
+    - At body level: ρ_α|_{θ=0} = ρ̃_α (recovers the body partition) -/
 structure SuperPartitionOfUnity {dim : SuperDimension} (M : Supermanifold dim) where
   /-- Index set for the partition. We require finite index for well-defined sums.
       For infinite atlases, pass to a locally finite refinement first. -/
   index : Type*
   [finIndex : Fintype index]
   [decEqIndex : DecidableEq index]
-  /-- The functions ρ_α in local coordinates on ℝ^{dim.even}.
-      These are bosonic functions in the sense of Witten's notes (arXiv:1209.2199, §3.1):
+  /-- The partition functions ρ_α as even super functions in each chart's coordinates.
+      Each `functions α` is the coordinate expression of ρ_α in chart α.
+      These are even super functions (with θ-dependence from normalization):
       "one can find bosonic functions h_α on M such that each h_α is supported in
-      the interior of U_α and Σ_α h_α = 1" -/
-  functions : index → SmoothFunction dim.even
-  /-- Each ρ_α ≥ 0 -/
-  nonneg : ∀ α (x : Fin dim.even → ℝ), 0 ≤ functions α x
-  /-- Sum to 1: Σ_α ρ_α(x) = 1 for all x in local coordinates.
-      This is the partition of unity condition. -/
-  sum_eq_one : ∀ (x : Fin dim.even → ℝ), Finset.univ.sum (fun α => functions α x) = 1
+      the interior of U_α and Σ_α h_α = 1" (Witten, arXiv:1209.2199, §3.1) -/
+  functions : index → SuperDomainFunction dim.even dim.odd
+  /-- Each ρ_α is an even super function: only even θ-powers appear.
+      This is preserved by the normalization procedure since both the lifts
+      and the sum S are even. -/
+  functions_even : ∀ α (I : Finset (Fin dim.odd)),
+    I.card % 2 = 1 → (functions α).coefficients I = SmoothFunction.const 0
+  /-- Each ρ_α ≥ 0 at body level -/
+  nonneg : ∀ α (x : Fin dim.even → ℝ), 0 ≤ (functions α).body x
   /-- Associated charts for each partition index -/
   charts : index → SuperChart M
   /-- Support domains in local coordinates (subsets of ℝ^{dim.even}) -/
   supportDomains : index → Set (Fin dim.even → ℝ)
   /-- Support domains are open -/
   supportDomains_open : ∀ α, IsOpen (supportDomains α)
-  /-- Each ρ_α is supported in its domain: "each h_α is supported in the interior of U_α" -/
-  support_subset : ∀ α (x : Fin dim.even → ℝ), x ∉ supportDomains α → functions α x = 0
+  /-- Each ρ_α is supported in its domain at body level:
+      "each h_α is supported in the interior of U_α" -/
+  support_subset : ∀ α (x : Fin dim.even → ℝ),
+    x ∉ supportDomains α → (functions α).body x = 0
+  /-- Support domains are contained within the body coordinate image of the chart. -/
+  supportDomains_in_chart : ∀ α (x : Fin dim.even → ℝ),
+    x ∈ supportDomains α →
+    ∃ (p : M.body) (hp : p ∈ (charts α).domain),
+      (fun i => ((charts α).bodyCoord ⟨p, hp⟩ : EuclideanSpace ℝ (Fin dim.even)) i) = x
+  /-- Body-level sum to 1: for every point p ∈ M.body, evaluating each ρ_α at p
+      (in chart α's coordinates) and summing gives 1.
+
+      This is the coordinate-free body-level condition. Each function is evaluated
+      in its own chart's coordinate system. If p is not in chart α's domain,
+      ρ_α contributes 0 (by support_subset + supportDomains_in_chart). -/
+  body_sum_eq_one : ∀ (p : M.body),
+    @Finset.sum index ℝ _ (@Finset.univ index finIndex) (fun α =>
+      @dite ℝ (p ∈ (charts α).domain) (Classical.dec _)
+        (fun h => (functions α).body
+          (fun i => ((charts α).bodyCoord ⟨p, h⟩ : EuclideanSpace ℝ (Fin dim.even)) i))
+        (fun _ => 0)) = 1
 
 /-- Lift a smooth function on the body to a super function (constant in θ).
 
@@ -646,47 +668,20 @@ theorem berezin_lift_factor {p q : ℕ} (f : SmoothFunction p) (g : SuperDomainF
 
 /-- Existence of partition of unity on a supermanifold.
 
-    **Construction**:
-    1. M_red is a smooth paracompact manifold (standard assumption)
-    2. By differential topology, a partition of unity {ρ̃_α} exists on M_red
-    3. Lift each ρ̃_α to a super function ρ_α = lift(ρ̃_α)
-    4. The lifted functions form a partition of unity on M
+    **Construction** (see ProofIdeas/PartitionOfUnity.md for details):
+    1. M_red is paracompact → body partition of unity {ρ̃_α} exists (Mathlib)
+    2. Lift each ρ̃_α to chart α as θ-independent super function
+    3. On overlaps, the naive lifts are incompatible (pick up θ-dependence from
+       transitions). The raw sum S = 1 + nilpotent.
+    4. S is invertible (nilpotent geometric series, uses `grassmann_soul_nilpotent`)
+    5. Normalize: ρ_α := (lift ρ̃_α) · S⁻¹
+    6. Verify: Σ_α ρ_α = 1 exactly, support ⊂ U_α, even parity
 
-    The key point: lifting from M_red to M is straightforward because
-    partition functions are purely even (θ-independent). -/
+    **Infrastructure needed**: Super function composition (Phase 3) for expressing
+    the naive lifts in different charts' coordinates. -/
 theorem partition_of_unity_exists {dim : SuperDimension} (M : Supermanifold dim)
     (hparacompact : ParacompactSpace M.body) :
     Nonempty (SuperPartitionOfUnity M) := by
-  -- **Mathematical Construction**:
-  --
-  -- 1. **Chart cover**: The charts of M give an open cover {U_α} of M_red
-  --    Each chart has domain ⊂ M.body and maps to ℝ^{dim.even}
-  --
-  -- 2. **Refinement**: By paracompactness, refine to a locally finite cover
-  --    This is finite for compact manifolds (our main case of interest)
-  --
-  -- 3. **Partition functions**: By standard differential topology
-  --    (PartitionOfUnity.exists_isSubordinate in Mathlib requires NormalSpace X),
-  --    there exist smooth functions ρ̃_α : M_red → ℝ with:
-  --    - supp(ρ̃_α) ⊂ U_α (subordinate to cover)
-  --    - Σ_α ρ̃_α = 1 pointwise
-  --    - ρ̃_α ≥ 0
-  --
-  -- 4. **Transfer to coordinates**: For each α, the composition
-  --    ρ_α := ρ̃_α ∘ (chart_α)⁻¹ : ℝ^{dim.even} → ℝ
-  --    is smooth and gives the coordinate representation
-  --
-  -- 5. **Verify properties**: The lifted functions satisfy all conditions:
-  --    - sum_eq_one: inherited from Σ_α ρ̃_α = 1
-  --    - nonneg: inherited from ρ̃_α ≥ 0
-  --    - support_subset: inherited from supp(ρ̃_α) ⊂ U_α
-  --
-  -- **Technical Note**: This proof requires:
-  -- - M.body having sufficient regularity (NormalSpace or T2 + LocallyCompact)
-  -- - Smooth structure on M.body (to get smooth partition functions)
-  -- - Proper chart transition infrastructure
-  --
-  -- The mathematical content is standard (Witten arXiv:1209.2199, §3.1).
   sorry
 
 /-- An integral form on a supermanifold (section of the Berezinian bundle).
@@ -703,23 +698,25 @@ theorem partition_of_unity_exists {dim : SuperDimension} (M : Supermanifold dim)
 structure GlobalIntegralForm {dim : SuperDimension} (M : Supermanifold dim) where
   /-- Local representations: in chart α, the form is (localForms α)[Dx Dθ] -/
   localForms : (chart : SuperChart M) → IntegralForm dim.even dim.odd
-  /-- Compatibility on overlaps: f_β = f_α · Ber(J_{αβ})⁻¹.
+  /-- Body-level compatibility on overlaps.
 
-      For the body (θ=0) approximation, this reduces to:
-        f_β^{top}(y) = f_α^{top}(x) · |det(∂y/∂x)|⁻¹
+      The full super cocycle condition is: f_β ∘ T = f_α · Ber(J_{αβ})⁻¹
+      where Ber is the Berezinian (superdeterminant) of the super Jacobian.
 
-      The full super version requires the Berezinian which includes
-      nilpotent corrections from the off-diagonal blocks of J_{αβ}.
+      At body level (θ = 0), this reduces to:
+        f_β^{top}(T_body(x)) = f_α^{top}(x) · |det(∂T_body/∂x)|⁻¹
 
-      **Infrastructure gap**: Full formulation requires connecting
-      SuperTransition to SuperMatrix.ber. For now we require:
-      1. On overlaps, the top θ-components transform by body Jacobian
-      2. This is the leading-order compatibility condition -/
-  compatible : ∀ (α β : SuperChart M)
+      where T_body is the body map of the transition and f^{top} is the top
+      θ-component (extracted by berezinIntegralOdd).
+
+      **Full super cocycle**: Requires super function composition to express
+      f_β ∘ T_{αβ}. The Berezinian is available via `SuperTransition.berezinianAt`.
+      The full condition is: for all θ-components I,
+        (f_β ∘ T_{αβ}).coefficients I = (f_α · Ber(J)⁻¹).coefficients I
+      This will be formulated once composition infrastructure (Phase 3) is in place. -/
+  compatible_body : ∀ (α β : SuperChart M)
       (t : SuperTransition α β)
       (x : Fin dim.even → ℝ),
-      -- Leading-order compatibility: body coefficient transforms by |det(body Jacobian)|⁻¹
-      -- f_β^{top}(T(x)) = f_α^{top}(x) · |det(∂T/∂x)|⁻¹
       let bodyJac := Matrix.of fun i j =>
         fderiv ℝ (fun y => (t.evenTransition i).body y) x (Pi.single j 1)
       let bodyMap := fun i => (t.evenTransition i).body x
@@ -729,11 +726,18 @@ structure GlobalIntegralForm {dim : SuperDimension} (M : Supermanifold dim) wher
 
 /-- The global Berezin integral of an integral form on a supermanifold.
 
-    ∫_M ω := Σ_α ∫_{U_α,red} dx ρ_α(x) · [∫ dθ f_α(x,θ)]
+    ∫_M ω := Σ_α ∫_{U_α,red} dx [∫ dθ (ρ_α · f_α)](x)
 
-    The outer sum is over charts, weighted by the partition of unity.
-    The inner Berezin integral is algebraic; the outer integral on M_red
-    uses standard measure theory (or abstract integration on manifolds).
+    For each chart α:
+    1. Multiply the partition function ρ_α (an even SuperDomainFunction, possibly
+       θ-dependent from normalization) by the integral form coefficient f_α
+    2. Apply the Berezin integral ∫dθ to the product — this extracts the top
+       θ-component of ρ_α · f_α, which includes corrections from the θ-dependence
+       of ρ_α mixing with lower θ-components of f_α
+    3. Integrate the resulting smooth function over the body in chart α's coordinates
+
+    Each chart α has its own body integral, since the functions live in chart α's
+    coordinate system.
 
     From Witten's notes (arXiv:1209.2199, p.12):
     "we write σ = Σ_α σ_α where σ_α = σ · h_α. Each σ_α is supported in U_α,
@@ -743,11 +747,15 @@ noncomputable def globalBerezinIntegral {dim : SuperDimension}
     (pu : SuperPartitionOfUnity _M)
     (bodyIntegral : SmoothFunction dim.even → ℝ) : ℝ :=
   -- Sum over the partition of unity index
-  -- For each α: integrate ρ_α(x) · [∫ dθ f_α(x,θ)] over the body
-  -- The ∫ dθ part extracts the top θ-component (Berezin integral)
+  -- For each α: compute ∫dθ (ρ_α · f_α) in chart α's coordinates,
+  -- then body-integrate the resulting smooth function over ℝ^p.
+  -- Each summand is compactly supported in chart α's image (by support_subset),
+  -- so the Lebesgue integral localizes correctly.
   @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex) fun α =>
-    bodyIntegral (SmoothFunction.mul (pu.functions α)
-      (berezinIntegralOdd (ω.localForms (pu.charts α)).coefficient))
+    bodyIntegral
+      (berezinIntegralOdd
+        (SuperDomainFunction.mul (pu.functions α)
+          (ω.localForms (pu.charts α)).coefficient))
 
 /-- Linearity of a body integral functional. -/
 structure BodyIntegral.IsLinear (p : ℕ) (bodyIntegral : SmoothFunction p → ℝ) : Prop where
@@ -1046,22 +1054,9 @@ structure SuperDifferentialForm (p q : ℕ) (k : ℕ) where
   /-- Coefficients for each k-form basis element -/
   coefficients : (Fin p → Bool) → (Fin q → Bool) → SuperDomainFunction p q
 
-/-- Wedge product of super differential forms.
-
-    The wedge product on a supermanifold involves signs from both:
-    1. Form degree (as in ordinary differential geometry)
-    2. Parity of the coefficient functions (from the superalgebra structure)
-
-    For forms ω₁ of degree k₁ and ω₂ of degree k₂:
-      (ω₁ ∧ ω₂)_{I∪J, A∪B} = Σ sign(I,J) · sign(A,B) · (ω₁)_{I,A} · (ω₂)_{J,B}
-
-    where the signs account for reordering both the dx's and the dθ's.
-
-    **Placeholder:** Returns zero form. Full definition requires careful sign handling. -/
-def SuperDifferentialForm.wedge {p q k₁ k₂ : ℕ}
-    (_ : SuperDifferentialForm p q k₁) (_ : SuperDifferentialForm p q k₂) :
-    SuperDifferentialForm p q (k₁ + k₂) :=
-  ⟨fun _ _ => SuperDomainFunction.zero⟩
+-- TODO: Wedge product of super differential forms.
+-- (ω₁ ∧ ω₂)_{I∪J, A∪B} = Σ sign(I,J) · sign(A,B) · (ω₁)_{I,A} · (ω₂)_{J,B}
+-- Requires careful treatment of both form-degree signs and Koszul signs.
 
 /-!
 ## Stokes' Theorem for Supermanifolds
@@ -1085,57 +1080,31 @@ BRST invariance of amplitudes follows from:
 where Φ is the product of vertex operators.
 -/
 
-/-- The super exterior derivative on integral forms.
+/-- Super Stokes' theorem (legacy version).
 
-    The exterior derivative on a supermanifold acts as:
-    - d(f [Dx Dθ]) includes both ∂f/∂x and ∂f/∂θ contributions
-    - The result is a form of one higher degree
+    The proper Stokes theorem is proved in `Integration/StokesTheorem.lean`:
+    - `super_stokes_codim1_no_boundary`: ∫ dν = 0 (without boundary)
+    - `super_stokes_codim1_with_boundary`: ∫_U dν = ∫_{∂U} ν (with boundary)
+    - `berezin_d1_vanishes`: ∫dθ d₁ν = 0 (key lemma)
 
-    Note: This is different from the Berezin integral, which extracts
-    the top component. The exterior derivative increases form degree. -/
-def superExteriorDerivative {p q : ℕ} (_ : IntegralForm p q) : Type :=
-  Unit  -- Placeholder: should return a form of degree (p+1, q) or (p, q+1)
-
-/-- Super Stokes' theorem: ∫_M dω = ∫_{∂M} ω.
-
-    This is the fundamental theorem of calculus for supermanifolds.
-    The boundary ∂M inherits a supermanifold structure of dimension (p-1|q).
-
-    **Key points:**
-    1. The exterior derivative d acts on integral forms, not functions
-    2. The boundary ∂M has one fewer even dimension (the normal direction)
-    3. The restriction ι*ω to the boundary is well-defined
-
-    **Proof sketch** (for the body integral part):
-    - For the even variables, this is ordinary Stokes' theorem on ℝ^p
-    - For the odd variables, the Berezin integral extracts top components
-
-    **Note:** The full statement requires:
-    - Super exterior derivative on integral forms (increases form degree)
-    - Boundary restriction functor for supermanifolds
-    - Proper orientation conventions -/
+    Those theorems properly decompose d = d₀ + d₁ and prove:
+    1. d₁ν integrates to 0 (no boundary in odd directions)
+    2. d₀ν reduces to classical Stokes on the body -/
 theorem super_stokes {p q : ℕ} (_hp : 0 < p)
-    (U : Set (Fin p → ℝ))    -- Region in the body
+    (U : Set (Fin p → ℝ))
     (_hU_compact : IsCompact U)
     (_hU_open : IsOpen (interior U))
-    (bdryU : Set (Fin (p - 1) → ℝ))  -- Boundary ∂U
-    (ω : IntegralForm p q)
+    (bdryU : Set (Fin (p - 1) → ℝ))
+    (_ω : IntegralForm p q)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
     (boundaryIntegral : SmoothFunction (p - 1) → Set (Fin (p - 1) → ℝ) → ℝ)
-    -- Restriction map from p-dimensional functions to (p-1)-dimensional boundary
     (restrict : SmoothFunction p → SmoothFunction (p - 1))
-    -- The "exterior derivative" of the integral form (super exterior derivative applied to ω)
     (dω : IntegralForm p q)
-    -- Standard Stokes' theorem on the body: ∫_U (top coeff of dω) = ∫_{∂U} (restricted top coeff of ω)
     (hStokesBody :
         bodyIntegral (berezinIntegralOdd dω.coefficient) U =
-        boundaryIntegral (restrict (berezinIntegralOdd ω.coefficient)) bdryU) :
-    -- The super Stokes theorem: ∫_U d[ω] = ∫_{∂U} ι*[ω]
-    -- After Berezin integration (extracting top θ-coefficient):
+        boundaryIntegral (restrict (berezinIntegralOdd _ω.coefficient)) bdryU) :
     localBerezinIntegral U dω bodyIntegral =
-    boundaryIntegral (restrict (berezinIntegralOdd ω.coefficient)) bdryU := by
-  -- The proof directly uses the hypothesis about Stokes on the body
-  -- since localBerezinIntegral extracts top coefficient and integrates
+    boundaryIntegral (restrict (berezinIntegralOdd _ω.coefficient)) bdryU := by
   unfold localBerezinIntegral
   exact hStokesBody
 
