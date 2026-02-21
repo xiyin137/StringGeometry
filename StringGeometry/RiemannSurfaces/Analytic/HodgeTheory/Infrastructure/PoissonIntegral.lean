@@ -384,7 +384,14 @@ theorem schwarzIntegral_differentiableAt (g : ℂ → ℝ) (c : ℂ) (R : ℝ) (
   -- schwarzIntegral = (2π)⁻¹ • ∫ ..., so DifferentiableAt follows
   show DifferentiableAt ℂ (fun z => ((2 * π)⁻¹ : ℝ) • ∫ θ in (0 : ℝ)..2 * π,
     ((g (ζ θ) : ℝ) : ℂ) * ((ζ θ - c + (z - c)) / (ζ θ - z))) z
-  exact key.differentiableAt.const_smul ((2 * π)⁻¹ : ℝ)
+  -- Convert ℝ-smul to ℂ-multiplication to avoid SMulCommClass ℂ ℝ ℂ
+  have h_smul_eq : (fun z => ((2 * π)⁻¹ : ℝ) • ∫ θ in (0 : ℝ)..2 * π,
+      ((g (ζ θ) : ℝ) : ℂ) * ((ζ θ - c + (z - c)) / (ζ θ - z))) =
+    (fun z => (((2 * π)⁻¹ : ℝ) : ℂ) * ∫ θ in (0 : ℝ)..2 * π,
+      ((g (ζ θ) : ℝ) : ℂ) * ((ζ θ - c + (z - c)) / (ζ θ - z))) := by
+    ext w; rw [Complex.real_smul]
+  rw [h_smul_eq]
+  exact key.differentiableAt.const_mul _
 
 /-- The Poisson integral is harmonic on the ball.
     This follows from the Schwarz integral being holomorphic:
@@ -437,9 +444,15 @@ private lemma circle_ratio_integral {c : ℂ} {R : ℝ} (hR : 0 < R)
     ring
   simp only [circleIntegral, h_eq] at hCauchy
   -- Pull I to the right: ∫ f(θ)*I = (∫ f(θ)) * I
-  rw [intervalIntegral.integral_mul_const] at hCauchy
   -- Cancel I from both sides: (∫ f) * I = 2π * I → ∫ f = 2π
-  exact mul_right_cancel₀ Complex.I_ne_zero hCauchy
+  have h_pull : ∫ θ in (0:ℝ)..2 * π,
+      (circleMap c R θ - c) / (circleMap c R θ - z) * I =
+    (∫ θ in (0:ℝ)..2 * π, (circleMap c R θ - c) / (circleMap c R θ - z)) * I :=
+    intervalIntegral.integral_mul_const _ _
+  have hCauchy' : (∫ θ in (0:ℝ)..2 * π,
+      (circleMap c R θ - c) / (circleMap c R θ - z)) * I = 2 * ↑Real.pi * I := by
+    rwa [← h_pull]
+  exact mul_right_cancel₀ Complex.I_ne_zero hCauchy'
 
 /-- Continuity of (ζ(θ)-c)/(ζ(θ)-z) as a function of θ. -/
 private lemma circle_ratio_continuous {c : ℂ} {R : ℝ} (hR : 0 < R)
@@ -468,10 +481,14 @@ private lemma schwarz_kernel_integral {c : ℂ} {R : ℝ} (hR : 0 < R)
       (fun θ => (circleMap c R θ - c) / (circleMap c R θ - z) : ℝ → ℂ) volume 0 (2 * π) :=
     (circle_ratio_continuous hR hz).intervalIntegrable 0 (2 * π)
   rw [intervalIntegral.integral_sub (hf_int.const_mul 2)
-    (intervalIntegrable_const (μ := volume)),
-    intervalIntegral.integral_const_mul, circle_ratio_integral hR hz,
-    intervalIntegral.integral_const]
-  simp only [sub_zero, Complex.real_smul, Complex.ofReal_mul, mul_one]
+    (intervalIntegrable_const (μ := volume))]
+  have h_const_mul : ∫ x in (0:ℝ)..2 * π,
+      2 * ((circleMap c R x - c) / (circleMap c R x - z)) =
+    2 * ∫ x in (0:ℝ)..2 * π, (circleMap c R x - c) / (circleMap c R x - z) :=
+    intervalIntegral.integral_const_mul _ _
+  rw [h_const_mul, circle_ratio_integral hR hz,
+    intervalIntegral.integral_const, sub_zero]
+  change 2 * (2 * ↑Real.pi) - (↑(2 * π) : ℂ) * 1 = 2 * ↑Real.pi
   push_cast; ring
 
 /-- Re((u+v)/(u-v)) = (‖u‖²-‖v‖²)/‖u-v‖² for u ≠ v. -/
@@ -531,11 +548,17 @@ private lemma poisson_kernel_integral {c : ℂ} {R : ℝ} (hR : 0 < R)
       ((continuous_circleMap c R).sub continuous_const)
       (fun θ => circleMap_sub_ne_zero hR hz θ)).intervalIntegrable 0 (2 * π)
   have h_re_comm := Complex.reCLM.intervalIntegral_comp_comm hK_int (a := 0) (b := 2 * π)
-  simp only [Complex.reCLM_apply] at h_re_comm
   have h_rw : (fun θ => ((circleMap c R θ - c + (z - c)) / (circleMap c R θ - z)).re) =
       (fun θ => (R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2) :=
     funext (schwarz_kernel_re hR hz)
-  rw [← h_rw, h_re_comm, schwarz_kernel_integral hR hz]
+  rw [← h_rw]
+  -- h_re_comm : ∫ reCLM (f x) = reCLM (∫ f x); need to convert reCLM to .re
+  have h_eq : ∫ θ in (0:ℝ)..2 * π,
+      ((circleMap c R θ - c + (z - c)) / (circleMap c R θ - z)).re =
+    (∫ θ in (0:ℝ)..2 * π,
+      (circleMap c R θ - c + (z - c)) / (circleMap c R θ - z)).re := by
+    exact_mod_cast h_re_comm
+  rw [h_eq, schwarz_kernel_integral hR hz]
   simp
 
 /-- Continuity of g ∘ circleMap. -/
@@ -568,9 +591,13 @@ private lemma poissonIntegralDisc_eq_real {c : ℂ} {R : ℝ} (hR : 0 < R)
       ((g (circleMap c R θ) : ℝ) : ℂ) *
         ((circleMap c R θ - c + (z - c)) / (circleMap c R θ - z))) volume 0 (2 * π) :=
     hK_cont.intervalIntegrable 0 (2 * π)
-  have hre := Complex.reCLM.intervalIntegral_comp_comm h_int
-  simp only [Complex.reCLM_apply] at hre
-  rw [hre.symm]
+  -- Re commutes with integral (reCLM and .re are definitionally equal)
+  have h_re_comm : (∫ θ in (0:ℝ)..2 * π,
+      (↑(g (circleMap c R θ)) : ℂ) * ((circleMap c R θ - c + (z - c)) / (circleMap c R θ - z))).re =
+    ∫ θ in (0:ℝ)..2 * π,
+      ((↑(g (circleMap c R θ)) : ℂ) * ((circleMap c R θ - c + (z - c)) / (circleMap c R θ - z))).re :=
+    (Complex.reCLM.intervalIntegral_comp_comm h_int).symm
+  rw [h_re_comm]
   apply intervalIntegral.integral_congr
   intro θ _
   simp only [Complex.re_ofReal_mul, schwarz_kernel_re hR hz]
@@ -607,11 +634,19 @@ theorem poissonIntegral_boundary_values (g : ℂ → ℝ) (c : ℂ) (R : ℝ) (h
   -- Write difference as integral
   have hg₀_eq : g ζ₀ = (2 * π)⁻¹ * ∫ θ in (0:ℝ)..(2*π),
       g ζ₀ * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2) := by
-    rw [intervalIntegral.integral_const_mul, hPr_int]
+    erw [intervalIntegral.integral_const_mul, hPr_int]
     field_simp
-  rw [hg₀_eq, ← mul_sub, ← intervalIntegral.integral_sub
-    ((hg_cont.mul hPr_cont).intervalIntegrable 0 (2*π))
-    ((continuous_const.mul hPr_cont).intervalIntegrable 0 (2*π))]
+  rw [hg₀_eq, ← mul_sub]
+  rw [show (∫ θ in (0:ℝ)..(2*π),
+        g (circleMap c R θ) * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2)) -
+      (∫ θ in (0:ℝ)..(2*π),
+        g ζ₀ * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2)) =
+    ∫ θ in (0:ℝ)..(2*π),
+      (g (circleMap c R θ) * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2) -
+       g ζ₀ * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2)) from
+    (intervalIntegral.integral_sub
+      ((hg_cont.mul hPr_cont).intervalIntegrable 0 (2*π))
+      ((continuous_const.mul hPr_cont).intervalIntegrable 0 (2*π))).symm]
   -- Simplify integrand: g(ζ(θ))*Pr - g(ζ₀)*Pr = (g(ζ(θ))-g(ζ₀))*Pr
   simp_rw [show ∀ θ, g (circleMap c R θ) * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2) -
     g ζ₀ * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2) =
@@ -643,8 +678,7 @@ theorem poissonIntegral_boundary_values (g : ℂ → ℝ) (c : ℂ) (R : ℝ) (h
     calc R ^ 2 - ‖z - c‖ ^ 2 = (R - ‖z - c‖) * (R + ‖z - c‖) := by ring
       _ ≤ dist z ζ₀ * (R + ‖z - c‖) :=
           mul_le_mul_of_nonneg_right h_tri (by linarith [norm_nonneg (z - c)])
-      _ < δ * (R + ‖z - c‖) :=
-          mul_lt_mul_of_pos_right hz_dist (by linarith [norm_nonneg (z - c)])
+      _ < δ * (R + ‖z - c‖) := by nlinarith [norm_nonneg (z - c)]
       _ ≤ δ * (2 * R) := mul_le_mul_of_nonneg_left (by linarith) hδ_pos.le
       _ = 2 * R * δ := by ring
   -- Pointwise bound: |g(ζ(θ))-g(ζ₀)| · Pr ≤ (ε/2) · Pr + C
@@ -708,10 +742,15 @@ theorem poissonIntegral_boundary_values (g : ℂ → ℝ) (c : ℂ) (R : ℝ) (h
   have h_int_val : ∫ θ in (0:ℝ)..(2*π),
       ((ε / 2) * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2) + C) =
       (ε / 2) * (2 * π) + C * (2 * π) := by
-    rw [intervalIntegral.integral_add
+    have h_add := (intervalIntegral.integral_add
       ((continuous_const.mul hPr_cont).intervalIntegrable 0 (2*π))
-      (intervalIntegrable_const (μ := volume)),
-      intervalIntegral.integral_const_mul, hPr_int,
+      (intervalIntegrable_const (μ := volume)) :
+      ∫ θ in (0:ℝ)..(2*π),
+        (ε / 2 * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2) + C) =
+      (∫ θ in (0:ℝ)..(2*π), ε / 2 * ((R ^ 2 - ‖z - c‖ ^ 2) / ‖circleMap c R θ - z‖ ^ 2)) +
+      ∫ θ in (0:ℝ)..(2*π), C)
+    rw [h_add]
+    erw [intervalIntegral.integral_const_mul, hPr_int,
       intervalIntegral.integral_const]
     simp only [sub_zero, smul_eq_mul]; ring
   rw [h_int_val] at h_int_norm
@@ -751,12 +790,14 @@ private theorem dist_add_le_of_closedBall_subset {z c : ℂ} {r R : ℝ} (hr : 0
     have hzc_ne : z - c ≠ 0 := sub_ne_zero.mpr hzc
     set u := (‖z - c‖⁻¹ : ℝ) • (z - c)
     have hu_norm : ‖u‖ = 1 := by
-      simp only [u, norm_smul, Real.norm_eq_abs, abs_inv, abs_norm]
+      simp only [u]
+      rw [Complex.real_smul, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_inv, abs_norm]
       exact inv_mul_cancel₀ (norm_ne_zero_iff.mpr hzc_ne)
     set w := z + r • u
     have hw_dist_z : dist w z = r := by
-      simp only [w, dist_eq_norm, add_sub_cancel_left, norm_smul,
-                  Real.norm_eq_abs, abs_of_pos hr, hu_norm, mul_one]
+      simp only [w, dist_eq_norm, add_sub_cancel_left]
+      rw [Complex.real_smul, norm_mul, Complex.norm_real, Real.norm_eq_abs,
+          abs_of_pos hr, hu_norm, mul_one]
     have hw_mem : w ∈ closedBall z r := by rw [mem_closedBall]; linarith
     have hw_cb := mem_closedBall.mp (hsub hw_mem)
     -- Show dist w c = r + dist z c
@@ -764,8 +805,8 @@ private theorem dist_add_le_of_closedBall_subset {z c : ℂ} {r R : ℝ} (hr : 0
       simp only [w, u, dist_eq_norm]
       -- w - c = (z - c) + r • (‖z-c‖⁻¹ • (z - c)) = (1 + r * ‖z-c‖⁻¹) • (z - c)
       have h_eq : z + r • (‖z - c‖⁻¹ • (z - c)) - c = (1 + r * ‖z - c‖⁻¹) • (z - c) := by
-        rw [smul_smul, add_smul, one_smul]; abel
-      rw [h_eq, norm_smul, Real.norm_eq_abs]
+        simp only [Complex.real_smul]; push_cast; ring
+      rw [h_eq, Complex.real_smul, norm_mul, Complex.norm_real, Real.norm_eq_abs]
       have hfactor_pos : 0 < 1 + r * ‖z - c‖⁻¹ := by positivity
       rw [abs_of_pos hfactor_pos]
       have hne : ‖z - c‖ ≠ 0 := norm_ne_zero_iff.mpr hzc_ne
@@ -999,14 +1040,5 @@ theorem mvp_implies_contDiffOn (f : ℂ → ℝ) (c : ℂ) (R : ℝ) (hR : 0 < R
   -- HarmonicAt → AnalyticAt ℝ → ContDiffAt ℝ ⊤
   intro z hz
   exact (HarmonicAt.analyticAt (hharm z hz)).contDiffAt.contDiffWithinAt
-
-/-- Corollary: MVP + C² implies Δf = 0 (for compatibility with existing code). -/
-theorem mvp_implies_laplacian_zero (f : ℂ → ℝ) (c : ℂ) (R : ℝ) (hR : 0 < R)
-    (hcont : ContinuousOn f (closedBall c R))
-    (hmvp : ∀ z ∈ ball c R, ∀ r > 0, closedBall z r ⊆ closedBall c R →
-      f z = circleAverage f z r) :
-    ∀ z ∈ ball c R, InnerProductSpace.laplacian f z = 0 := by
-  intro z hz
-  exact (mvp_implies_harmonicOnNhd f c R hR hcont hmvp z hz).2.self_of_nhds
 
 end RiemannSurfaces.Analytic.Infrastructure

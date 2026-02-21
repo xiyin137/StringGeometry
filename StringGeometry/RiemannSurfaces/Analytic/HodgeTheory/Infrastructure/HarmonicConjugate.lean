@@ -2,6 +2,7 @@ import Mathlib.Analysis.Complex.Harmonic.Analytic
 import Mathlib.Analysis.Complex.Harmonic.MeanValue
 import Mathlib.Analysis.InnerProductSpace.Harmonic.Constructions
 import Mathlib.AlgebraicTopology.FundamentalGroupoid.SimplyConnected
+import Mathlib.LinearAlgebra.Complex.FiniteDimensional
 
 /-!
 # Harmonic Conjugate Theory
@@ -33,6 +34,9 @@ The imaginary part Im ∘ F is then the harmonic conjugate.
 namespace RiemannSurfaces.Analytic.Infrastructure
 
 open Complex Metric Set InnerProductSpace Filter Topology
+
+-- FiniteDimensional ℝ ℂ instance (needed due to Lean 4 module visibility)
+instance : FiniteDimensional ℝ ℂ := Complex.basisOneI.finiteDimensional_of_finite
 
 /-!
 ## Local Existence of Harmonic Conjugate

@@ -334,49 +334,43 @@ def toSuperAlgebra : SuperAlgebra ℝ where
     Since the only nonzero odd elements are multiples of θ and θ² = 0,
     supercommutativity follows from the fact that even elements commute
     and odd * odd = 0 (so -0 = 0). -/
+private theorem super_comm_proof (a b : toSuperAlgebra.carrier) (pa pb : Parity)
+    (ha : if pa = Parity.even then a ∈ toSuperAlgebra.even else a ∈ toSuperAlgebra.odd)
+    (hb : if pb = Parity.even then b ∈ toSuperAlgebra.even else b ∈ toSuperAlgebra.odd) :
+    a * b = Parity.koszulSign pa pb • (b * a) := by
+  -- Cast a and b to OddLineAlgebra to use ext and simp lemmas
+  let a' : OddLineAlgebra := a
+  let b' : OddLineAlgebra := b
+  -- The key: show the goal is equivalent to a statement about OddLineAlgebra
+  suffices h : a' * b' = Parity.koszulSign pa pb • (b' * a') from h
+  cases pa <;> cases pb
+  · -- even * even
+    simp only [↓reduceIte] at ha hb
+    have ha' : a'.soul = 0 := ha
+    have hb' : b'.soul = 0 := hb
+    simp only [Parity.koszulSign_even_left, one_zsmul]
+    ext <;> simp [ha', hb', mul_comm]
+  · -- even * odd
+    simp only [↓reduceIte] at ha hb
+    have ha' : a'.soul = 0 := ha
+    have hb' : b'.body = 0 := hb
+    simp only [Parity.koszulSign_even_left, one_zsmul]
+    ext <;> simp [ha', hb']; ring
+  · -- odd * even
+    simp only [↓reduceIte] at ha hb
+    have ha' : a'.body = 0 := ha
+    have hb' : b'.soul = 0 := hb
+    simp only [Parity.koszulSign_even_right, one_zsmul]
+    ext <;> simp [ha', hb']; ring
+  · -- odd * odd: both products are 0
+    have ha' : a'.body = 0 := ha
+    have hb' : b'.body = 0 := hb
+    have hab : a' * b' = 0 := by ext <;> simp [ha', hb']
+    have hba : b' * a' = 0 := by ext <;> simp [ha', hb']
+    rw [hab, hba, smul_zero]
+
 instance : SuperCommutative toSuperAlgebra where
-  super_comm := fun a b pa pb ha hb => by
-    cases pa <;> cases pb
-    · -- even * even = even * even (commutative)
-      -- Goal: a * b = koszulSign even even • (b * a) = 1 • (b * a) = b * a
-      simp only [↓reduceIte] at ha hb
-      have ha' : a.soul = 0 := ha
-      have hb' : b.soul = 0 := hb
-      simp only [Parity.koszulSign_even_left, one_zsmul]
-      apply OddLineAlgebra.ext
-      · exact mul_comm a.body b.body
-      · rw [mul_soul, mul_soul, ha', hb']; ring
-    · -- even * odd: need ab = ba (koszulSign even odd = 1)
-      simp only [↓reduceIte] at ha hb
-      have ha' : a.soul = 0 := ha
-      have hb' : b.body = 0 := hb
-      simp only [Parity.koszulSign_even_left, one_zsmul]
-      apply OddLineAlgebra.ext
-      · rw [mul_body, mul_body, hb']; ring
-      · rw [mul_soul, mul_soul, ha', hb']; ring
-    · -- odd * even: need ab = ba (koszulSign odd even = 1)
-      simp only [↓reduceIte] at ha hb
-      have ha' : a.body = 0 := ha
-      have hb' : b.soul = 0 := hb
-      simp only [Parity.koszulSign_even_right, one_zsmul]
-      apply OddLineAlgebra.ext
-      · rw [mul_body, mul_body, ha']; ring
-      · rw [mul_soul, mul_soul, ha', hb']; ring
-    · -- odd * odd: ab = -ba, but both are 0 so 0 = -0
-      -- ha : a ∈ toSuperAlgebra.odd, hb : b ∈ toSuperAlgebra.odd
-      have ha' : a.body = 0 := ha
-      have hb' : b.body = 0 := hb
-      -- Goal: a * b = koszulSign odd odd • (b * a) = (-1) • (b * a)
-      -- Both sides are 0 since odd * odd has body = 0 and soul = 0
-      have hab : a * b = 0 := by
-        apply OddLineAlgebra.ext
-        · rw [mul_body, ha', zero_mul, zero_body]
-        · rw [mul_soul, ha', hb', mul_zero, zero_mul, add_zero, zero_soul]
-      have hba : b * a = 0 := by
-        apply OddLineAlgebra.ext
-        · rw [mul_body, hb', zero_mul, zero_body]
-        · rw [mul_soul, ha', hb', mul_zero, zero_mul, add_zero, zero_soul]
-      rw [hab, hba, smul_zero]
+  super_comm := super_comm_proof
 
 /-- 1 is in the even part (body = 1, soul = 0). -/
 theorem one_mem_even : (1 : OddLineAlgebra) ∈ evenSubmodule := rfl

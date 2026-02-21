@@ -2,6 +2,7 @@ import Mathlib.Algebra.Ring.Basic
 import Mathlib.Algebra.Module.Basic
 import Mathlib.Analysis.Calculus.Deriv.Basic
 import Mathlib.Analysis.Calculus.ContDiff.Basic
+import Mathlib.Analysis.Calculus.ContDiff.Deriv
 import Mathlib.Analysis.Calculus.ContDiff.Operations
 import Mathlib.Data.Complex.Basic
 
@@ -197,7 +198,7 @@ noncomputable def superholomorphic_comp (f g : Superholomorphic) : Superholomorp
     have h2 : ContDiff ℝ (⊤ : ℕ∞) g.f.f1 := g.f1_smooth
     -- Term 3: deriv f₀ is smooth (derivative of C^∞ is C^∞)
     -- contDiff_infty_iff_deriv: ContDiff 𝕜 (⊤ : ℕ∞) f ↔ Differentiable 𝕜 f ∧ ContDiff 𝕜 (⊤ : ℕ∞) (deriv f)
-    have h3 : ContDiff ℝ (⊤ : ℕ∞) (deriv f.f.f0) := (contDiff_infty_iff_deriv.mp f.f0_smooth).2
+    have h3 : ContDiff ℝ (⊤ : ℕ∞) (deriv f.f.f0) := (contDiff_infty_iff_deriv.1 f.f0_smooth).2
     -- Term 4: deriv f₀ ∘ g₀ is smooth
     have h4 : ContDiff ℝ (⊤ : ℕ∞) (fun z => deriv f.f.f0 (g.f.f0 z)) := h3.comp g.f0_smooth
     -- Product and sum of smooth functions is smooth

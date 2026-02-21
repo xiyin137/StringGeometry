@@ -241,8 +241,10 @@ theorem exp_log_one_sub_nilpotent (x : R) (N : ℕ) (hNil : x^(N + 1) = 0) :
     cases N' with
     | zero =>
       -- N = 1: x² = 0, L = -x, exp(-x) = 1 - x (since higher terms vanish)
-      simp only [zero_add, range_one, sum_singleton,
-                 cast_one, one_div_one, map_one, one_mul, pow_one]
+      simp only [zero_add, range_one, sum_singleton, cast_one, pow_one]
+      -- Reduce (algebraMap ℚ R) (1/1) * x to x
+      have h1div1 : (algebraMap ℚ R) (1 / (1 : ℚ)) = 1 := by norm_num
+      rw [h1div1, one_mul]
       -- Goal: IsNilpotent.exp (-x) = 1 - x
       -- For x² = 0: (-x)² = x² = 0, so exp(-x) = 1 + (-x) = 1 - x
       have hx2 : x^2 = 0 := hNil
@@ -268,10 +270,13 @@ theorem exp_log_one_sub_nilpotent (x : R) (N : ℕ) (hNil : x^(N + 1) = 0) :
         -- Compute the log sum: -∑_{k<2} (1/(k+1)) * x^{k+1} = -x - (1/2)x²
         have hLogSum : -∑ k ∈ range 2, (algebraMap ℚ R (1 / (k + 1 : ℕ))) * x^(k + 1) =
             -x - (algebraMap ℚ R (1/2)) * x^2 := by
-          rw [sum_range_succ, sum_range_succ, range_zero, sum_empty]
-          simp only [zero_add, cast_one, one_div_one, map_one, one_mul, pow_one]
-          norm_num
-          simp only [sub_eq_add_neg, sq]
+          simp only [sum_range_succ, range_zero, sum_empty, zero_add, show (0 : ℕ) + 1 = 1 from rfl,
+            show (1 : ℕ) + 1 = 2 from rfl, pow_one]
+          have h1div1 : (algebraMap ℚ R) (1 / (1 : ℕ)) = 1 := by
+            simp only [cast_one]; norm_num
+          rw [h1div1, one_mul]
+          have h1div2 : (1 : ℚ) / (2 : ℕ) = 1 / 2 := by norm_num
+          rw [h1div2]
           ring
         rw [hLogSum]
         set c := algebraMap ℚ R (1/2) with hc
@@ -440,8 +445,12 @@ theorem expMatrixNilpotent_eq_IsNilpotent_exp {n : ℕ}
   simp only [hNil, smul_zero, add_zero]
   apply Finset.sum_congr rfl
   intro k _
-  simp only [one_div, Algebra.smul_def]
-  rfl
+  -- LHS: (algebraMap S (Matrix...)) ((algebraMap ℚ S) (1 / ↑k!)) * A ^ k
+  -- RHS: (↑k!)⁻¹ • A ^ k
+  rw [show (1 : ℚ) / (↑k.factorial : ℚ) = (↑k.factorial : ℚ)⁻¹ from one_div _]
+  -- Now LHS is: (algebraMap ℚ S) (↑k!)⁻¹ • A ^ k, RHS is: (↑k!)⁻¹ • A ^ k
+  -- These are S-smul vs ℚ-smul; connected by algebraMap_smul
+  rw [algebraMap_smul]
 
 /-- The trace of logMatrix equals logDetNilpotent -/
 theorem trace_logMatrix_eq_logDetNilpotent {n : ℕ}
@@ -514,7 +523,8 @@ theorem expMatrix_logMatrix_eq {n : ℕ}
       simp only [L_poly, mul_neg, neg_inj, Finset.mul_sum]
       apply sum_congr rfl; intro k _; rw [pow_succ, mul_comm Polynomial.X, mul_assoc]
     obtain ⟨P, hP⟩ := hL_factor
-    rw [← map_pow, hP, mul_pow, mul_comm, map_mul, map_pow, hπX_nil, mul_zero]
+    rw [← map_pow, hP, mul_pow, mul_comm, map_mul, map_pow, hπX_nil]
+    exact mul_zero _
 
   -- aeval X L_poly = logMatrixOneSubNilpotent X N
   have haeval_L : Polynomial.aeval X L_poly = logMatrixOneSubNilpotent X N := by
@@ -536,7 +546,7 @@ theorem expMatrix_logMatrix_eq {n : ℕ}
   have hLj_zero : ∀ j, N + 1 ≤ j → (π L_poly) ^ j = 0 := by
     intro j hj
     have : j = (N + 1) + (j - (N + 1)) := by omega
-    rw [this, pow_add, hL_nil, zero_mul]
+    rw [this, pow_add, hL_nil]; exact zero_mul _
 
   -- π exp_poly = IsNilpotent.exp (π L_poly)
   have hπ_exp : π exp_poly = IsNilpotent.exp (π L_poly) := by
@@ -549,7 +559,8 @@ theorem expMatrix_logMatrix_eq {n : ℕ}
     · subst hN0
       simp only [Nat.zero_mul, zero_add, range_one, sum_singleton, pow_zero,
                  Nat.factorial_zero, Nat.cast_one, div_one, map_one,
-                 one_mul, inv_one, one_smul]
+                 inv_one, one_smul, map_mul, map_pow]
+      exact mul_one _
     · -- For N ≥ 1: N + 1 ≤ N * N + 1
       have hNN_ge : N + 1 ≤ N * N + 1 := by
         have hN_sq : N ≤ N * N := Nat.le_mul_self N; omega
@@ -562,8 +573,8 @@ theorem expMatrix_logMatrix_eq {n : ℕ}
             π (Polynomial.C (algebraMap ℚ S (1 / ↑(Nat.factorial j))) * L_poly ^ j) = 0 := by
           apply sum_eq_zero; intro j hj
           simp only [mem_Ico] at hj
-          rw [map_mul, map_pow, hLj_zero j hj.1, mul_zero]
-        rw [hLHS_high, add_zero]
+          rw [map_mul, map_pow, hLj_zero j hj.1]; exact mul_zero _
+        rw [hLHS_high]; exact add_zero _
       -- exp_eq_sum with x^(N+1)=0 gives range (N+1), so RHS already matches
       rw [hLHS]
       -- Now both sides are ∑_{j<N+1} with matching terms
@@ -571,9 +582,8 @@ theorem expMatrix_logMatrix_eq {n : ℕ}
       rw [map_mul, map_pow]
       -- LHS: π(C(algebraMap ℚ S (1/j!))) * (π L_poly)^j
       -- RHS: (j!)⁻¹ • (π L_poly)^j
-      simp only [one_div, ← halg]
-      -- Goal: algebraMap ℚ Q (j!)⁻¹ * (π L_poly)^j = (j!)⁻¹ • (π L_poly)^j
-      rw [← Algebra.smul_def]
+      rw [← halg, show (1 : ℚ) / (↑j.factorial : ℚ) = (↑j.factorial : ℚ)⁻¹ from one_div _,
+          ← Algebra.smul_def]
 
   -- π exp_poly = 1 - x
   have hπ_result : π exp_poly = π (1 - Polynomial.X) := by
@@ -581,7 +591,7 @@ theorem expMatrix_logMatrix_eq {n : ℕ}
 
   -- exp_poly - (1 - X) ∈ I, so aeval X exp_poly = aeval X (1 - X)
   have hdiff_in_I : exp_poly - (1 - Polynomial.X) ∈ I := by
-    rw [← Ideal.Quotient.eq_zero_iff_mem, map_sub, hπ_result, sub_self]
+    rw [← Ideal.Quotient.eq_zero_iff_mem, map_sub, hπ_result]; exact sub_self _
 
   have hdivisible : ∃ r, exp_poly - (1 - Polynomial.X) = Polynomial.X ^ (N + 1) * r := by
     simp only [I, Ideal.mem_span_singleton] at hdiff_in_I; exact hdiff_in_I
@@ -625,9 +635,8 @@ theorem det_expMatrix_eq_exp_trace_one
   rw [hPow N, hEntryNil, smul_zero, add_zero]
   apply Finset.sum_congr rfl
   intro k _
-  rw [hPow]
-  simp only [one_div, Algebra.smul_def]
-  rfl
+  rw [hPow, show (1 : ℚ) / (↑k.factorial : ℚ) = (↑k.factorial : ℚ)⁻¹ from one_div _,
+      Algebra.smul_def, ← IsScalarTower.algebraMap_apply ℚ S S, ← Algebra.smul_def]
 
 /-- Jacobi's formula: det(exp(A)) = exp(tr(A)). Proven for n=0,1; n>=2 is axiomatic. -/
 theorem det_expMatrix_eq_exp_trace {n : ℕ}
@@ -677,10 +686,12 @@ theorem det_eq_exp_logDet {n : ℕ}
         unfold expMatrixNilpotent logMatrixOneSubNilpotent
         simp only [hNil, Finset.range_zero, Finset.sum_empty, neg_zero, sub_zero]
         rw [Finset.sum_range_succ']
-        simp only [pow_zero, Nat.factorial_zero, Nat.cast_one, one_div_one, map_one, one_smul]
+        have halg1 : (algebraMap ℚ S) ((1 : ℚ) / 1) = 1 := by simp
+        simp only [pow_zero, Nat.factorial_zero, Nat.cast_one, halg1, one_smul]
         suffices h : ∑ x ∈ Finset.range M, (algebraMap ℚ S) (1 / ↑(x + 1).factorial) • (0 : Matrix (Fin n) (Fin n) S) ^ (x + 1) = 0 by
-          rw [h, zero_add]
-        apply Finset.sum_eq_zero; intro k _; simp only [pow_succ, mul_zero, smul_zero]
+          rw [h]; exact zero_add _
+        apply Finset.sum_eq_zero; intro k _
+        rw [pow_succ]; simp only [MulZeroClass.mul_zero, smul_zero]
       · -- N ≠ 0 and M > N * N
         -- L^{N+1} = 0, so expMatrixNilpotent L M = expMatrixNilpotent L (N+1) for M ≥ N+1
         -- And expMatrixNilpotent L (N*N) = expMatrixNilpotent L (N+1) when N+1 ≤ N*N
@@ -748,7 +759,8 @@ theorem det_eq_exp_logDet {n : ℕ}
           have hLog1 : logMatrixOneSubNilpotent X 1 = -X := by
             unfold logMatrixOneSubNilpotent
             simp only [Finset.range_one, Finset.sum_singleton, zero_add,
-              Nat.cast_one, one_div_one, map_one, one_smul, pow_one]
+              Nat.cast_one, pow_one]
+            rw [show (1 : ℚ) / 1 = 1 from one_div_one, map_one, one_smul]
           rw [hLog1]
           unfold expMatrixNilpotent
           -- expMatrixNilpotent (-X) 2 = ∑_{k<3} (1/k!) • (-X)^k
@@ -756,11 +768,9 @@ theorem det_eq_exp_logDet {n : ℕ}
           simp only [Nat.add_one]
           rw [Finset.sum_range_succ, Finset.sum_range_succ, Finset.sum_range_succ,
               Finset.range_zero, Finset.sum_empty]
-          simp only [pow_zero, Nat.factorial_zero, Nat.cast_one, one_div_one, map_one, one_smul,
-            pow_one, Nat.factorial_one, zero_add]
-          rw [neg_sq, hNil, smul_zero, add_zero]
-          -- Goal: 1 + (-X) = 1 - X
-          simp only [sub_eq_add_neg]
+          simp only [pow_zero, Nat.factorial_zero, Nat.cast_one, pow_one, Nat.factorial_one, zero_add]
+          rw [show (1 : ℚ) / 1 = 1 from one_div_one, map_one, one_smul, one_smul,
+              neg_sq, hNil, smul_zero]; simp [add_zero, sub_eq_add_neg]
         · -- N ≥ 2: N + 1 ≤ N * N
           have hN2 : 2 ≤ N := by
             cases N with
@@ -869,9 +879,8 @@ theorem expNilpotent_eq_isNilpotent_exp (x : S) (N : ℕ) (hNil : x^(N + 1) = 0)
   apply Finset.sum_congr rfl
   intro k _
   -- Convert between algebraMap and smul notation
-  rw [Algebra.smul_def]
-  congr 1
-  simp only [one_div]
+  rw [show (1 : ℚ) / (↑k.factorial : ℚ) = (↑k.factorial : ℚ)⁻¹ from one_div _,
+      ← Algebra.smul_def]
 
 /-- exp(0) = 1. -/
 theorem expNilpotent_zero (N : ℕ) : expNilpotent (0 : S) N = 1 := by

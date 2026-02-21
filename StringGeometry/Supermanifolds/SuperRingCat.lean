@@ -5,6 +5,7 @@ Released under Apache 2.0 license.
 import StringGeometry.Supermanifolds.Superalgebra
 import Mathlib.CategoryTheory.Category.Basic
 import Mathlib.CategoryTheory.ConcreteCategory.Basic
+import Mathlib.CategoryTheory.Types.Basic
 import Mathlib.Algebra.Ring.Hom.Defs
 
 /-!

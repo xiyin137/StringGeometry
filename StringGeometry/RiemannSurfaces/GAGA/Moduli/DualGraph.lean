@@ -149,7 +149,7 @@ end DualGraph
 def boolCompleteGraph : SimpleGraph Bool where
   Adj := fun a b => a ≠ b
   symm := fun _ _ h => h.symm
-  loopless := fun _ h => h rfl
+  loopless := ⟨fun _ h => h rfl⟩
 
 instance : ∀ v, Fintype (boolCompleteGraph.neighborSet v) := fun v => by
   have : boolCompleteGraph.neighborSet v = {!v} := by

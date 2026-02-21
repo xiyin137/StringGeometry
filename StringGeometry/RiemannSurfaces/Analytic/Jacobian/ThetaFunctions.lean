@@ -240,12 +240,12 @@ theorem characteristicFromBits_injective (g : ℕ) :
     funext i
     have hi := congrFun ha i
     simp only at hi
-    by_cases h1 : a1 i <;> by_cases h2 : a2 i <;> simp_all
+    by_cases h1 : a1 i <;> by_cases h2 : a2 i <;> simp_all <;> norm_num at hi
   · -- b1 = b2
     funext i
     have hi := congrFun hb i
     simp only at hi
-    by_cases h1 : b1 i <;> by_cases h2 : b2 i <;> simp_all
+    by_cases h1 : b1 i <;> by_cases h2 : b2 i <;> simp_all <;> norm_num at hi
 
 /-- Number of half-integer characteristics is 2^{2g} -/
 theorem num_half_int_characteristics (g : ℕ) :

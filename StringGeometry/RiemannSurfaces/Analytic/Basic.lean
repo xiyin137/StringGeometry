@@ -11,6 +11,7 @@ import Mathlib.Analysis.Convex.PathConnected
 import Mathlib.Topology.Compactification.OnePoint.Basic
 import Mathlib.Topology.OpenPartialHomeomorph.Basic
 import Mathlib.Analysis.Analytic.Basic
+import Mathlib.Analysis.Normed.Field.Lemmas
 import Mathlib.Analysis.SpecialFunctions.Complex.Analytic
 import Mathlib.Analysis.SpecialFunctions.Complex.Circle
 import StringGeometry.RiemannSurfaces.Topology.Basic
@@ -336,14 +337,17 @@ noncomputable def riemannSphereInftyChart : OpenPartialHomeomorph (OnePoint ℂ)
       constructor
       · exact ⟨Metric.isClosed_closedBall, isCompact_closedBall 0 (1/ε)⟩
       · intro z hz
-        simp only [Set.mem_compl_iff, Metric.mem_closedBall, dist_zero_right, not_le] at hz
+        simp only [Set.mem_compl_iff, Metric.mem_closedBall, not_le] at hz
+        rw [dist_eq_norm, sub_zero] at hz
         simp only [Function.comp_apply]
         by_cases hz0 : z = 0
-        · -- z = 0: but |0| = 0 < 1/ε since ε > 0, so 0 ∈ closedBall, contradiction
-          simp only [hz0, norm_zero] at hz
-          exact absurd (one_div_pos.mpr hε) (not_lt.mpr (le_of_lt hz))
+        · -- z = 0: but ‖0‖ = 0 < 1/ε since ε > 0, so 0 ∈ closedBall, contradiction
+          subst hz0
+          have : (‖(0 : ℂ)‖ : ℝ) = 0 := norm_zero
+          linarith [div_pos one_pos hε]
         · -- z ≠ 0: f(coe z) = z⁻¹, and |z⁻¹| = 1/|z| < ε since |z| > 1/ε
-          simp only [hz0, ↓reduceIte, Metric.mem_ball, dist_zero_right, norm_inv]
+          simp only [hz0, ↓reduceIte, Metric.mem_ball]
+          rw [dist_eq_norm, sub_zero, norm_inv]
           have hz_pos : 0 < ‖z‖ := norm_pos_iff.mpr hz0
           -- From 1/ε < ‖z‖, we get ‖z‖⁻¹ < ε
           calc ‖z‖⁻¹ < (1/ε)⁻¹ := (inv_lt_inv₀ hz_pos (one_div_pos.mpr hε)).mpr hz
@@ -361,7 +365,8 @@ noncomputable def riemannSphereInftyChart : OpenPartialHomeomorph (OnePoint ℂ)
       rw [OnePoint.continuousAt_coe]
       -- f ∘ coe (w) = if w = 0 then 0 else w⁻¹
       -- At z ≠ 0, in a neighborhood of z (not containing 0), this is just w⁻¹
-      have h_inv_cont : ContinuousAt (fun w : ℂ => w⁻¹) z := continuousAt_inv₀ hz_ne
+      have h_inv_cont : ContinuousAt (fun w : ℂ => w⁻¹) z :=
+        (differentiableAt_inv (𝕜 := ℂ) hz_ne).continuousAt
       apply h_inv_cont.congr
       -- The functions agree in a neighborhood of z
       filter_upwards [Metric.ball_mem_nhds z (norm_pos_iff.mpr hz_ne)]
@@ -369,7 +374,9 @@ noncomputable def riemannSphereInftyChart : OpenPartialHomeomorph (OnePoint ℂ)
       simp only [Function.comp_apply]
       by_cases hw0 : w = 0
       · -- w = 0 would mean |0 - z| < |z|, i.e., |z| < |z|, contradiction
-        simp only [hw0, Metric.mem_ball, dist_zero_left] at hw
+        subst hw0
+        simp only [Metric.mem_ball] at hw
+        rw [dist_comm, dist_eq_norm, sub_zero] at hw
         exact (lt_irrefl _ hw).elim
       · simp only [hw0, ↓reduceIte]
   continuousOn_invFun := by
@@ -392,7 +399,9 @@ noncomputable def riemannSphereInftyChart : OpenPartialHomeomorph (OnePoint ℂ)
       obtain ⟨M, hM_pos, hM⟩ := hK_compact.isBounded.subset_ball_lt 0 0
       apply Filter.eventually_of_mem (Metric.ball_mem_nhds 0 (by positivity : 0 < 1/(M+1)))
       intro w' hw'
-      simp only [Metric.mem_ball, dist_zero_right] at hw'
+      simp only [Metric.mem_ball] at hw'
+      -- Convert dist to norm (erw needed due to instance diamond)
+      have hw'_norm : ‖w'‖ < 1 / (M + 1) := by erw [dist_zero_right] at hw'; exact hw'
       by_cases hw'0 : w' = 0
       · -- f(0) = ∞
         simp only [hw'0, ↓reduceIte]
@@ -406,28 +415,31 @@ noncomputable def riemannSphereInftyChart : OpenPartialHomeomorph (OnePoint ℂ)
         · -- w'⁻¹ ∉ K because |w'⁻¹| > M
           intro hK
           have hM_bound := hM hK
-          simp only [Metric.mem_ball, dist_zero_right] at hM_bound
+          simp only [Metric.mem_ball] at hM_bound
           have hw'_pos : 0 < ‖w'‖ := norm_pos_iff.mpr hw'0
-          rw [norm_inv] at hM_bound
-          have h1 : ‖w'‖⁻¹ < M := hM_bound
+          -- Convert dist to norm and norm_inv (instance diamond)
+          have hM_bound' : ‖w'⁻¹‖ < M := by erw [dist_zero_right] at hM_bound; exact hM_bound
+          have h1 : ‖w'‖⁻¹ < M := by erw [norm_inv] at hM_bound'; exact hM_bound'
           have h2 : M⁻¹ < ‖w'‖ := inv_lt_of_inv_lt₀ hw'_pos h1
           have h3 : (M + 1)⁻¹ ≤ M⁻¹ := inv_anti₀ hM_pos (by linarith : M ≤ M + 1)
           have h4 : (M + 1)⁻¹ < ‖w'‖ := lt_of_le_of_lt h3 h2
           rw [inv_eq_one_div] at h4
-          linarith
+          linarith [hw'_norm]
         · rfl
     · -- At w ≠ 0: invFun(w) = coe(w⁻¹)
       -- invFun w' = if w' = 0 then OnePoint.infty else OnePoint.some w'⁻¹
       -- For w' near w ≠ 0, this equals OnePoint.some w'⁻¹
       have h_cont : ContinuousAt (fun w' => OnePoint.some (w'⁻¹ : ℂ)) w :=
-        OnePoint.continuous_coe.continuousAt.comp (continuousAt_inv₀ hw)
+        OnePoint.continuous_coe.continuousAt.comp ((differentiableAt_inv (𝕜 := ℂ) hw).continuousAt)
       apply h_cont.congr
       -- Show the functions agree in a neighborhood of w
       filter_upwards [Metric.ball_mem_nhds w (norm_pos_iff.mpr hw)]
       intro w' hw'
       by_cases hw'0 : w' = 0
       · -- w' = 0 would mean |w| < |w|, contradiction
-        simp only [hw'0, Metric.mem_ball, dist_zero_left] at hw'
+        subst hw'0
+        simp only [Metric.mem_ball] at hw'
+        rw [dist_comm, dist_eq_norm, sub_zero] at hw'
         exact (lt_irrefl _ hw').elim
       · simp only [hw'0, ↓reduceIte]
 
@@ -511,8 +523,6 @@ theorem riemannSphereInftyChart_symm_apply (z : ℂ) (hz : z ≠ 0) :
 noncomputable instance isManifold_onePoint : IsManifold (modelWithCornersSelf ℂ ℂ) ⊤ (OnePoint ℂ) where
   compatible := fun {e e'} he he' => by
     simp only [atlas] at he he'
-    simp only [chartedSpace_onePoint] at he he'
-    simp only [Set.mem_insert_iff, Set.mem_singleton_iff] at he he'
     -- Need to check all four combinations of charts
     -- The key is that z ↦ 1/z is holomorphic on ℂ \ {0}, hence ContDiff ℂ ∞
     rcases he with rfl | rfl <;> rcases he' with rfl | rfl

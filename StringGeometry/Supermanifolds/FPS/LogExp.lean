@@ -69,8 +69,8 @@ noncomputable def expCoeff (n : ℕ) : ℚ :=
 @[simp] theorem expCoeff_zero : expCoeff 0 = 1 := by simp [expCoeff]
 
 theorem expCoeff_pos (n : ℕ) : 0 < expCoeff n := by
-  simp [expCoeff]
-  exact Nat.factorial_pos n
+  unfold expCoeff
+  exact _root_.div_pos one_pos (Nat.cast_pos.mpr (Nat.factorial_pos n))
 
 /-! ### The Key Coefficient Sequence: exp(log(1-x)) -/
 

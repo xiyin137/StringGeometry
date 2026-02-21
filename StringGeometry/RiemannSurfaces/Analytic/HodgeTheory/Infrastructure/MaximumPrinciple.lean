@@ -1,6 +1,7 @@
 import Mathlib.Analysis.Complex.AbsMax
 import Mathlib.Analysis.InnerProductSpace.Harmonic.Constructions
 import Mathlib.Analysis.Complex.Harmonic.MeanValue
+import Mathlib.LinearAlgebra.Complex.FiniteDimensional
 import Mathlib.MeasureTheory.Integral.CircleAverage
 import Mathlib.MeasureTheory.Integral.Bochner.Basic
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
@@ -39,6 +40,11 @@ namespace RiemannSurfaces.Analytic.Infrastructure
 
 open Complex Metric Set Filter MeasureTheory InnerProductSpace Real
 
+-- In Lean 4.29 module system, the FiniteDimensional ℝ ℂ instance from
+-- Mathlib.LinearAlgebra.Complex.FiniteDimensional may not be visible in non-module files.
+-- We re-declare it here.
+instance : FiniteDimensional ℝ ℂ := Complex.basisOneI.finiteDimensional_of_finite
+
 /-!
 ## Helper Lemmas for HarmonicOnNhd
 -/
@@ -73,7 +79,7 @@ Key lemma: if f is continuous, f ≤ M on sphere, and circleAverage f = M, then 
     Since g ≥ 0 and has zero average, g = 0 a.e. by integral theory.
     By continuity, g = 0 everywhere, so f = M. -/
 theorem eq_of_circleAverage_eq_of_le {f : ℂ → ℝ} {z₀ : ℂ} {r : ℝ} {M : ℝ}
-    (hr : r ≠ 0) (hcont : ContinuousOn f (sphere z₀ |r|))
+    (_hr : r ≠ 0) (hcont : ContinuousOn f (sphere z₀ |r|))
     (hle : ∀ z ∈ sphere z₀ |r|, f z ≤ M)
     (havg : circleAverage f z₀ r = M) :
     ∀ z ∈ sphere z₀ |r|, f z = M := by
@@ -192,7 +198,7 @@ then u must equal u(z₀) on the entire circle (since all values ≤ max).
 
     This is the key lemma. The proof uses the mean value property:
     if f(z₀) = max and f(z₀) = average, then f = f(z₀) everywhere. -/
-theorem harmonic_maximum_principle_ball {f : ℂ → ℝ} {z₀ : ℂ} {r : ℝ} (hr : 0 < r)
+theorem harmonic_maximum_principle_ball {f : ℂ → ℝ} {z₀ : ℂ} {r : ℝ} (_hr : 0 < r)
     (hf : HarmonicOnNhd f (closedBall z₀ r))
     (hmax : ∀ z ∈ closedBall z₀ r, f z ≤ f z₀) :
     ∀ z ∈ closedBall z₀ r, f z = f z₀ := by

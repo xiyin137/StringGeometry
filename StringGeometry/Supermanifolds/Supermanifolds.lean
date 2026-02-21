@@ -1514,7 +1514,7 @@ noncomputable def partialEven {p q : ℕ} (i : Fin p) : SuperDomainFunction p q 
     -- the fact that derivatives of smooth functions are smooth
     ⟨fun x => fderiv ℝ (f.coefficients I).toFun x (Pi.single i 1),
      -- The proof that ∂f_I/∂xⁱ is smooth follows from ContDiff.fderiv_right and clm_apply
-     (f.coefficients I).smooth.fderiv_right le_top |>.clm_apply contDiff_const⟩⟩
+     (f.coefficients I).smooth.fderiv_right (le_of_eq (WithTop.top_add (1 : WithTop ℕ∞))) |>.clm_apply contDiff_const⟩⟩
 
 /-- Partial derivative with respect to an odd coordinate.
     For f = Σ_J f_J θ^J, we have ∂f/∂θᵃ = Σ_{a ∈ J} ±f_J θ^{J\{a}}.

@@ -150,12 +150,12 @@ noncomputable instance instAddCommGroup (U : OpenSet RS) : AddCommGroup (Skyscra
   nsmul_zero s := ext (zero_smul ℕ s.val)
   nsmul_succ n s := ext (by
     show (n + 1) • s.val = n • s.val + s.val
-    rw [add_smul, one_smul])
+    rw [add_smul]; erw [one_smul])
   zsmul n s := ⟨n • s.val, fun hne => by rw [s.prop hne]; simp⟩
   zsmul_zero' s := ext (zero_smul ℤ s.val)
   zsmul_succ' n s := ext (by
     show (n.succ : ℤ) • s.val = (n : ℤ) • s.val + s.val
-    rw [Int.natCast_succ, add_smul, one_smul])
+    rw [Int.natCast_succ, add_smul]; erw [one_smul])
   zsmul_neg' n s := ext (by
     show (Int.negSucc n) • s.val = -((n.succ : ℤ) • s.val)
     simp only [Int.negSucc_eq, neg_smul, Nat.succ_eq_add_one, Nat.cast_add, Nat.cast_one])
@@ -203,6 +203,31 @@ theorem restrict_comp {U V W : OpenSet RS} (hUV : U ≤ V) (hVW : V ≤ W)
     simp only [hpU, hpV, ↓reduceDIte]
   · simp only [hpU, ↓reduceDIte]
 
+/-- The raw scalar multiplication for the skyscraper O-module.
+    Extracted as a named def so that simp lemmas can be stated before the Module instance. -/
+private noncomputable def skyscraperSmul {O : StructureSheaf RS} {U : OpenSet RS}
+    (f : O.sections U) (s : SkyscraperSection p U) : SkyscraperSection p U :=
+  if h : p ∈ U.carrier then
+    ⟨O.evalAt U p h f * s.val, fun hne => absurd h hne⟩
+  else
+    ⟨0, fun _ => rfl⟩
+
+@[simp] private lemma skyscraperSmul_val_pos {O : StructureSheaf RS} {U : OpenSet RS}
+    {f : O.sections U} {s : SkyscraperSection p U} (hp : p ∈ U.carrier) :
+    (skyscraperSmul f s).val = O.evalAt U p hp f * s.val := by
+  unfold skyscraperSmul; rw [dif_pos hp]
+
+@[simp] private lemma skyscraperSmul_val_neg {O : StructureSheaf RS} {U : OpenSet RS}
+    {f : O.sections U} {s : SkyscraperSection p U} (hp : p ∉ U.carrier) :
+    (skyscraperSmul f s).val = 0 := by
+  unfold skyscraperSmul; rw [dif_neg hp]
+
+private lemma skyscraperSmul_eq_dite {O : StructureSheaf RS} {U : OpenSet RS}
+    (f : O.sections U) (s : SkyscraperSection p U) :
+    skyscraperSmul f s = (if h : p ∈ U.carrier then
+      ⟨O.evalAt U p h f * s.val, fun hne => absurd h hne⟩
+    else ⟨0, fun _ => rfl⟩) := rfl
+
 /-- Module instance for SkyscraperSection over O(U).
 
     The skyscraper sheaf is naturally an O-module: for f ∈ O(U) and s ∈ ℂ_p(U),
@@ -211,13 +236,10 @@ theorem restrict_comp {U V W : OpenSet RS} (hUV : U ≤ V) (hVW : V ≤ W)
     When p ∉ U, sections are 0, so the module action is trivially 0. -/
 noncomputable instance instModule {O : StructureSheaf RS} (U : OpenSet RS) :
     Module (O.sections U) (SkyscraperSection p U) where
-  smul f s :=
-    if h : p ∈ U.carrier then
-      ⟨O.evalAt U p h f * s.val, fun hne => absurd h hne⟩
-    else
-      ⟨0, fun _ => rfl⟩
+  smul := skyscraperSmul
   one_smul s := by
-    show (if h : p ∈ U.carrier then _ else _) = s
+    show skyscraperSmul 1 s = s
+    rw [skyscraperSmul_eq_dite]
     by_cases hp : p ∈ U.carrier
     · simp only [hp, ↓reduceDIte]
       apply ext
@@ -226,38 +248,33 @@ noncomputable instance instModule {O : StructureSheaf RS} (U : OpenSet RS) :
       apply ext
       exact (s.prop hp).symm
   mul_smul f g s := by
-    show (if h : p ∈ U.carrier then _ else _) =
-         (if h : p ∈ U.carrier then _ else _)
+    show skyscraperSmul (f * g) s = skyscraperSmul f (skyscraperSmul g s)
+    apply ext
     by_cases hp : p ∈ U.carrier
-    · simp only [hp, ↓reduceDIte]
-      apply ext
-      show O.evalAt U p hp (f * g) * s.val = O.evalAt U p hp f * (O.evalAt U p hp g * s.val)
-      simp only [map_mul, mul_assoc]
-    · simp only [hp, ↓reduceDIte]
+    · simp only [skyscraperSmul_val_pos hp, map_mul, mul_assoc]
+    · simp only [skyscraperSmul_val_neg hp]
   smul_zero f := by
-    show (if h : p ∈ U.carrier then _ else _) = 0
+    show skyscraperSmul f 0 = 0
+    rw [skyscraperSmul_eq_dite]
     by_cases hp : p ∈ U.carrier
     · simp only [hp, ↓reduceDIte]
       apply ext
-      show O.evalAt U p hp f * (0 : SkyscraperSection p U).val = (0 : SkyscraperSection p U).val
       simp only [zero_val', mul_zero]
     · simp only [hp, ↓reduceDIte]
       rfl
   smul_add f s t := by
-    show (if h : p ∈ U.carrier then _ else _) =
-         (if h : p ∈ U.carrier then _ else _) + (if h : p ∈ U.carrier then _ else _)
+    show skyscraperSmul f (s + t) = skyscraperSmul f s + skyscraperSmul f t
+    rw [skyscraperSmul_eq_dite, skyscraperSmul_eq_dite, skyscraperSmul_eq_dite]
     by_cases hp : p ∈ U.carrier
     · simp only [hp, ↓reduceDIte]
       apply ext
-      show O.evalAt U p hp f * (s.val + t.val) =
-           (O.evalAt U p hp f * s.val) + (O.evalAt U p hp f * t.val)
-      ring
+      simp only [add_val, mul_add]
     · simp only [hp, ↓reduceDIte]
       apply ext
       simp only [add_val, add_zero]
   add_smul f g s := by
-    show (if h : p ∈ U.carrier then _ else _) =
-         (if h : p ∈ U.carrier then _ else _) + (if h : p ∈ U.carrier then _ else _)
+    show skyscraperSmul (f + g) s = skyscraperSmul f s + skyscraperSmul g s
+    rw [skyscraperSmul_eq_dite, skyscraperSmul_eq_dite, skyscraperSmul_eq_dite]
     by_cases hp : p ∈ U.carrier
     · simp only [hp, ↓reduceDIte]
       apply ext
@@ -266,7 +283,8 @@ noncomputable instance instModule {O : StructureSheaf RS} (U : OpenSet RS) :
       apply ext
       simp only [add_val, add_zero]
   zero_smul s := by
-    show (if h : p ∈ U.carrier then _ else _) = 0
+    show skyscraperSmul 0 s = 0
+    rw [skyscraperSmul_eq_dite]
     by_cases hp : p ∈ U.carrier
     · simp only [hp, ↓reduceDIte]
       apply ext

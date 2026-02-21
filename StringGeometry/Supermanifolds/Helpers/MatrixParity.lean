@@ -267,9 +267,8 @@ lemma isNilpotent_odd_mul_odd {k : Type*} [Field k] [CharZero k] {Λ : Grassmann
     [hSC : SuperCommutative Λ.toSuperAlgebra]
     (x y : Λ.carrier) (hx : x ∈ Λ.odd) (hy : y ∈ Λ.odd) : IsNilpotent (x * y) := by
   -- yx = -xy by anticommutativity
-  have hyx : y * x = -(x * y) := by
-    have h := @SuperCommutative.odd_anticomm k _ Λ.toSuperAlgebra hSC x y hx hy
-    rw [h, neg_neg]
+  have hyx : y * x = -(x * y) :=
+    (@SuperCommutative.odd_anticomm k _ Λ.toSuperAlgebra hSC y x hy hx)
   -- x² = 0 (from x² = -x² and CharZero)
   have hx2_zero : x * x = 0 := by
     have hx2 : x * x = -(x * x) := @SuperCommutative.odd_anticomm k _ Λ.toSuperAlgebra hSC x x hx hx

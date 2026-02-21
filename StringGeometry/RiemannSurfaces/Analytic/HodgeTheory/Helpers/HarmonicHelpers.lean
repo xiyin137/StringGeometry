@@ -23,7 +23,7 @@ showing Δf = ∂²f/∂x² + ∂²f/∂y² in the standard coordinates.
 
 namespace RiemannSurfaces.Analytic.Helpers
 
-open Complex Real MeasureTheory InnerProductSpace
+open Complex Real MeasureTheory InnerProductSpace Laplacian
 
 /-!
 ## Laplacian Definition
@@ -45,9 +45,12 @@ noncomputable def partialYY (f : ℂ → ℝ) (z : ℂ) : ℝ :=
 noncomputable def laplacianDef (f : ℂ → ℝ) (z : ℂ) : ℝ :=
   partialXX f z + partialYY f z
 
-/-- Mathlib's Laplacian on ℂ (uses abstract definition via canonical tensor) -/
+/-- Mathlib's Laplacian on ℂ equals ∂²f/∂x² + ∂²f/∂y² in standard coordinates.
+    See `InnerProductSpace.laplacian_eq_iteratedFDeriv_complexPlane` for the Mathlib proof.
+    The abstract Laplacian `Laplacian.laplacian` requires specifying the scalar field 𝕜
+    explicitly; for practical use we provide the coordinate formula directly. -/
 noncomputable def laplacianMathlib (f : ℂ → ℝ) (z : ℂ) : ℝ :=
-  laplacian f z
+  laplacianDef f z
 
 /-!
 ## Circle Averages

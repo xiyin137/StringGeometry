@@ -64,7 +64,7 @@ A function u : Σ → ℝ on a Riemann surface is harmonic if Δu = 0, where
 
 namespace RiemannSurfaces.Analytic
 
-open Complex
+open Complex Laplacian
 
 /-!
 ## Harmonic Functions in the Plane
@@ -93,7 +93,7 @@ def HarmonicOn (f : ℂ → ℝ) (U : Set ℂ) : Prop :=
     This equals the coordinate definition `Helpers.laplacianDef` for C² functions.
     We use Mathlib's definition for direct compatibility with `HarmonicAt`. -/
 noncomputable def laplacian (f : ℂ → ℝ) (z : ℂ) : ℝ :=
-  InnerProductSpace.laplacian f z
+  Δ f z
 
 /-- Characterization: harmonic iff C² and Laplacian vanishes.
 
@@ -109,8 +109,8 @@ theorem harmonic_iff_laplacian_zero (f : ℂ → ℝ) (U : Set ℂ) (hU : IsOpen
   -- HarmonicOn f U = IsOpen U ∧ HarmonicOnNhd f U
   -- HarmonicOnNhd f U = ∀ z ∈ U, HarmonicAt f z  (Mathlib)
   -- HarmonicAt f z = ContDiffAt ℝ 2 f z ∧ Δ f =ᶠ[𝓝 z] 0  (Mathlib)
-  -- laplacian f z = InnerProductSpace.laplacian f z  (our def)
-  simp only [HarmonicOn]
+  -- laplacian f z = Δ f z  (our def)
+  simp only [HarmonicOn, laplacian]
   constructor
   · -- Forward: HarmonicOn → ∀ z ∈ U, ContDiffAt ∧ Δ f z = 0
     intro ⟨_, hharm⟩ z hz

@@ -52,16 +52,17 @@ theorem coeff_pow_eq_zero_of_gt (g : R⟦X⟧) (hg : CompositionWellDefined g)
   induction k generalizing n with
   | zero => omega
   | succ k ih =>
-    rw [pow_succ, coeff_mul]
+    rw [pow_succ']
+    show coeff n (g * g ^ k) = 0
+    rw [coeff_mul]
     apply sum_eq_zero
     intro ⟨i, j⟩ hij
     simp only [mem_antidiagonal] at hij
-    by_cases hik : i < k
-    · simp only [ih i hik, zero_mul]
-    · push_neg at hik
-      have hj : j = 0 := by omega
-      subst hj
-      rw [coeff_zero_eq_constantCoeff, hg, mul_zero]
+    by_cases hjk : j < k
+    · exact mul_eq_zero_of_right _ (ih j hjk)
+    · have hi : i = 0 := by omega
+      subst hi
+      rw [coeff_zero_eq_constantCoeff, hg, zero_mul]
 
 /-! ### Powers of series with positive index -/
 
@@ -89,6 +90,6 @@ theorem coeff_sum_pow_stabilizes (f : R⟦X⟧) (g : R⟦X⟧) (hg : Composition
   apply sum_eq_zero
   intro k hk
   simp only [mem_Ico] at hk
-  rw [coeff_smul, coeff_pow_eq_zero_of_gt g hg n k hk.1, smul_zero]
+  simp only [map_smul, coeff_pow_eq_zero_of_gt g hg n k hk.1, smul_zero]
 
 end FPSComposition

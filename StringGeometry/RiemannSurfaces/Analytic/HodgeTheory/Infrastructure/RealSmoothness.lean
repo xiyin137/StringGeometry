@@ -39,6 +39,7 @@ namespace RiemannSurfaces.Analytic
 open scoped Manifold
 open Complex Topology
 
+
 /-!
 ## Core Infrastructure: ℂ-Smooth Implies ℝ-Smooth
 
@@ -50,6 +51,8 @@ The fundamental bridging lemma: every ℂ-smooth function is ℝ-smooth.
 theorem differentiableAt_real_of_complex {E F : Type*}
     [NormedAddCommGroup E] [NormedSpace ℂ E]
     [NormedAddCommGroup F] [NormedSpace ℂ F]
+    [NormedSpace ℝ E] [IsScalarTower ℝ ℂ E]
+    [NormedSpace ℝ F] [IsScalarTower ℝ ℂ F]
     {f : E → F} {x : E} (hf : DifferentiableAt ℂ f x) :
     DifferentiableAt ℝ f x := by
   -- Every ℂ-linear map is ℝ-linear via restrict scalars
@@ -60,6 +63,8 @@ theorem differentiableAt_real_of_complex {E F : Type*}
 theorem differentiable_real_of_complex {E F : Type*}
     [NormedAddCommGroup E] [NormedSpace ℂ E]
     [NormedAddCommGroup F] [NormedSpace ℂ F]
+    [NormedSpace ℝ E] [IsScalarTower ℝ ℂ E]
+    [NormedSpace ℝ F] [IsScalarTower ℝ ℂ F]
     {f : E → F} (hf : Differentiable ℂ f) :
     Differentiable ℝ f :=
   hf.restrictScalars ℝ
@@ -69,6 +74,8 @@ theorem differentiable_real_of_complex {E F : Type*}
 theorem contDiff_zero_real_of_complex {E F : Type*}
     [NormedAddCommGroup E] [NormedSpace ℂ E]
     [NormedAddCommGroup F] [NormedSpace ℂ F]
+    [NormedSpace ℝ E] [IsScalarTower ℝ ℂ E]
+    [NormedSpace ℝ F] [IsScalarTower ℝ ℂ F]
     {f : E → F} (hf : ContDiff ℂ 0 f) :
     ContDiff ℝ 0 f := by
   rw [contDiff_zero] at hf ⊢
@@ -79,6 +86,8 @@ theorem contDiff_zero_real_of_complex {E F : Type*}
 theorem contDiff_one_real_of_complex {E F : Type*}
     [NormedAddCommGroup E] [NormedSpace ℂ E]
     [NormedAddCommGroup F] [NormedSpace ℂ F]
+    [NormedSpace ℝ E] [IsScalarTower ℝ ℂ E]
+    [NormedSpace ℝ F] [IsScalarTower ℝ ℂ F]
     {f : E → F} (hf : ContDiff ℂ 1 f) :
     ContDiff ℝ 1 f := by
   rw [contDiff_one_iff_fderiv] at hf ⊢
@@ -104,6 +113,8 @@ theorem contDiff_one_real_of_complex {E F : Type*}
 theorem contDiff_real_of_complex {E F : Type*}
     [NormedAddCommGroup E] [NormedSpace ℂ E]
     [NormedAddCommGroup F] [NormedSpace ℂ F]
+    [NormedSpace ℝ E] [IsScalarTower ℝ ℂ E]
+    [NormedSpace ℝ F] [IsScalarTower ℝ ℂ F]
     {f : E → F} {n : ℕ∞} (hf : ContDiff ℂ n f) :
     ContDiff ℝ n f :=
   -- Mathlib provides this via HasFTaylorSeriesUpToOn.restrictScalars
@@ -126,7 +137,9 @@ theorem isManifold_real_of_complex {M : Type*}
     modelWithCornersSelf_coe_symm, Set.preimage_id_eq, Set.range_id,
     OpenPartialHomeomorph.trans_source] at hfwd ⊢
   -- Apply scalar restriction: ℂ-smooth implies ℝ-smooth
-  exact hfwd.restrict_scalars ℝ
+  -- Workaround: IsScalarTower ℝ ℂ ℂ synthesis fails due to instance diamond
+  exact @ContDiffOn.restrict_scalars ℝ _ ℂ _ _ ℂ _ _ _ _ _ ℂ _ _ _
+    IsScalarTower.right _ IsScalarTower.right hfwd
 
 /-- ℂ-smooth on manifolds implies ℝ-smooth.
     Key insight: The ChartedSpace structure is the same (charts map to ℂ).
@@ -151,8 +164,9 @@ theorem contMDiff_real_of_complex {M N : Type*}
   have eq1 : extChartAt 𝓘(ℝ, ℂ) x = extChartAt 𝓘(ℂ, ℂ) x := rfl
   have eq2 : extChartAt 𝓘(ℝ, ℂ) y = extChartAt 𝓘(ℂ, ℂ) y := rfl
   rw [eq1, eq2]
-  -- Apply scalar restriction
-  exact hC.restrict_scalars ℝ
+  -- Apply scalar restriction (explicit @ to bypass IsScalarTower ℝ ℂ ℂ diamond)
+  exact @ContDiffOn.restrict_scalars ℝ _ ℂ _ _ ℂ _ _ _ _ _ ℂ _ _ _
+    IsScalarTower.right _ IsScalarTower.right hC
 
 /-- Specialization for functions from a Riemann surface to ℂ. -/
 theorem contMDiff_real_of_complex_rs {RS : RiemannSurface} {f : RS.carrier → ℂ}
@@ -178,25 +192,16 @@ theorem contMDiff_real_of_complex_rs {RS : RiemannSurface} {f : RS.carrier → �
 Complex conjugation is ℝ-smooth but not ℂ-smooth (it's antiholomorphic).
 -/
 
-/-- Complex conjugation is an ℝ-linear continuous map. -/
-def conjCLM : ℂ →L[ℝ] ℂ where
-  toFun := starRingEnd ℂ
-  map_add' := map_add (starRingEnd ℂ)
-  map_smul' := fun r z => by
-    -- r • z for r : ℝ and z : ℂ is r * z (scalar multiplication)
-    -- conj(r * z) = r * conj(z) since conj(r) = r for r ∈ ℝ
-    simp only [RingHom.id_apply]
-    rw [Complex.real_smul, Complex.real_smul]
-    rw [map_mul, Complex.conj_ofReal]
-  cont := Complex.continuous_conj
+/-- Complex conjugation as a continuous ℝ-linear map (from Mathlib's conjCLE). -/
+def conjCLM : ℂ →L[ℝ] ℂ := Complex.conjCLE.toContinuousLinearMap
 
 /-- Complex conjugation is ℝ-smooth as a map ℂ → ℂ. -/
 theorem conj_contDiff_real : ContDiff ℝ ⊤ (starRingEnd ℂ : ℂ → ℂ) :=
-  conjCLM.contDiff
+  Complex.conjCLE.contDiff
 
 /-- Conjugation is ℝ-smooth for any smoothness level. -/
-theorem conj_contDiff_real_n {n : ℕ∞} : ContDiff ℝ n (starRingEnd ℂ : ℂ → ℂ) :=
-  conj_contDiff_real.of_le le_top
+theorem conj_contDiff_real_n {n : WithTop ℕ∞} : ContDiff ℝ n (starRingEnd ℂ : ℂ → ℂ) :=
+  conj_contDiff_real.of_le (WithTop.le_def.mpr (Or.inl rfl))
 
 /-- Composition with conjugation preserves ℝ-smoothness. -/
 theorem contDiff_conj_comp {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
@@ -364,18 +369,12 @@ end RealSmoothFunction
 The real and imaginary parts of an ℝ-smooth function are also ℝ-smooth.
 -/
 
-/-- The real part as a continuous ℝ-linear map. -/
-def Complex.reCLM : ℂ →L[ℝ] ℝ := Complex.reLm.toContinuousLinearMap
-
-/-- The imaginary part as a continuous ℝ-linear map. -/
-def Complex.imCLM : ℂ →L[ℝ] ℝ := Complex.imLm.toContinuousLinearMap
-
 /-- Real part extraction is ℝ-smooth. -/
-theorem Complex.re_contDiff_real : ContDiff ℝ ⊤ (Complex.re : ℂ → ℝ) :=
+theorem re_contDiff_real : ContDiff ℝ ⊤ (Complex.re : ℂ → ℝ) :=
   Complex.reCLM.contDiff
 
 /-- Imaginary part extraction is ℝ-smooth. -/
-theorem Complex.im_contDiff_real : ContDiff ℝ ⊤ (Complex.im : ℂ → ℝ) :=
+theorem im_contDiff_real : ContDiff ℝ ⊤ (Complex.im : ℂ → ℝ) :=
   Complex.imCLM.contDiff
 
 /-- The real part of an ℝ-smooth function is ℝ-smooth (as a real-valued function). -/
@@ -385,7 +384,7 @@ theorem RealSmoothFunction.re_smooth {RS : RiemannSurface}
     letI := RS.chartedSpace
     ContMDiff 𝓘(ℝ, ℂ) 𝓘(ℝ, ℝ) ⊤ (fun p => (f.toFun p).re) := by
   letI := RS.topology; letI := RS.chartedSpace
-  exact Complex.re_contDiff_real.comp_contMDiff f.smooth'
+  exact re_contDiff_real.comp_contMDiff f.smooth'
 
 /-- The imaginary part of an ℝ-smooth function is ℝ-smooth (as a real-valued function). -/
 theorem RealSmoothFunction.im_smooth {RS : RiemannSurface}
@@ -394,7 +393,7 @@ theorem RealSmoothFunction.im_smooth {RS : RiemannSurface}
     letI := RS.chartedSpace
     ContMDiff 𝓘(ℝ, ℂ) 𝓘(ℝ, ℝ) ⊤ (fun p => (f.toFun p).im) := by
   letI := RS.topology; letI := RS.chartedSpace
-  exact Complex.im_contDiff_real.comp_contMDiff f.smooth'
+  exact im_contDiff_real.comp_contMDiff f.smooth'
 
 /-!
 ## Converting ℂ-Smooth to ℝ-Smooth

@@ -4,6 +4,7 @@ import Mathlib.Analysis.Complex.Basic
 import Mathlib.Data.Complex.Basic
 import Mathlib.Analysis.Convex.PathConnected
 import Mathlib.Topology.Compactification.OnePoint.Sphere
+import Mathlib.LinearAlgebra.Complex.FiniteDimensional
 
 /-!
 # Basic Topology for Riemann Surfaces
@@ -84,12 +85,16 @@ instance OnePoint.Complex.normalSpace : NormalSpace (OnePoint ℂ) :=
 
     This is the homeomorphism given by `onePointEquivSphereOfFinrankEq`
     using that ℂ has real dimension 2, so OnePoint ℂ ≃ₜ S² ⊂ ℝ³. -/
+-- FiniteDimensional ℝ ℂ instance (needed due to Lean 4 module visibility)
+instance : FiniteDimensional ℝ ℂ := Complex.basisOneI.finiteDimensional_of_finite
+
 noncomputable instance OnePoint.Complex.secondCountableTopology :
     SecondCountableTopology (OnePoint ℂ) := by
   -- OnePoint ℂ is homeomorphic to the 2-sphere in ℝ³
   -- via onePointEquivSphereOfFinrankEq, using finrank ℝ ℂ = 2
+  haveI : FiniteDimensional ℝ ℂ := inferInstance
   let e : OnePoint ℂ ≃ₜ Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1 :=
-    onePointEquivSphereOfFinrankEq (by rw [Complex.finrank_real_complex]; rfl)
+    onePointEquivSphereOfFinrankEq (by erw [Complex.finrank_real_complex]; decide)
   -- The 2-sphere is second countable (as a subspace of the second countable space ℝ³)
   exact e.secondCountableTopology
 

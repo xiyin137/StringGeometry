@@ -2248,7 +2248,7 @@ theorem grassmann_body_soul_decomp {q : ℕ} (x : FiniteGrassmannCarrier q) :
     x = grassmannBodyEmbed x + grassmannSoul x := by
   funext I
   show x I = (grassmannBodyEmbed x + grassmannSoul x) I
-  rw [Pi.add_apply]
+  change x I = grassmannBodyEmbed x I + grassmannSoul x I
   unfold grassmannBodyEmbed grassmannScalar grassmannBody grassmannSoul
   by_cases hI : I = ∅
   · simp [hI]

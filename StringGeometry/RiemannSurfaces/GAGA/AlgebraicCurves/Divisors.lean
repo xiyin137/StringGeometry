@@ -695,7 +695,7 @@ theorem support_sub_coeff_point (D : Divisor RS) (p : RS.carrier) :
     -- (D - D.coeff p • point p).coeff q = D.coeff q - D.coeff p * (point p).coeff q
     have hcoeff : (D - D.coeff p • point p).coeff q = D.coeff q - D.coeff p * (point p).coeff q := by
       rw [sub_coeff, smul_coeff]
-    rw [hcoeff, hqD, zero_sub] at hq
+    rw [hcoeff, hqD] at hq; erw [zero_sub] at hq
     -- If q = p: (point p).coeff q = 1, so - D.coeff p ≠ 0 → D.coeff p ≠ 0
     -- But then D.coeff q = D.coeff p ≠ 0 (since q = p), contradiction with hqD
     -- If q ≠ p: (point p).coeff q = 0, so - D.coeff p * 0 = 0, contradiction with hq

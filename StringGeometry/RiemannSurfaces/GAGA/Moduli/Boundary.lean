@@ -50,8 +50,8 @@ inductive BoundaryDivisorType (g : ℕ)
 theorem delta0_has_one_node (g : ℕ) (hg : g ≥ 1) :
     (oneNodeNonsepGraph g hg).numEdges = 1 := by
   simp only [DualGraph.numEdges, DualGraph.numSimpleEdges, DualGraph.totalSelfLoops,
-             oneNodeNonsepGraph, Finset.univ_unique, Finset.sum_singleton,
-             SimpleGraph.bot_degree, Nat.zero_div, zero_add]
+             oneNodeNonsepGraph, Finset.univ_unique, Finset.sum_singleton]
+  erw [SimpleGraph.bot_degree]
 
 /-- Δ_0 is stable for g ≥ 2 -/
 theorem delta0_stable (g : ℕ) (hg : g ≥ 2) : (oneNodeNonsepGraph g (by omega)).isStable := by
@@ -66,7 +66,8 @@ theorem deltaI_has_one_node (g i : ℕ) (hi : 1 ≤ i ∧ i ≤ g / 2) :
              oneNodeSepGraph]
   -- boolCompleteGraph has sum of degrees = 2, so numSimpleEdges = 2/2 = 1
   -- selfLoops are all 0
-  simp only [boolCompleteGraph_degree_sum, Finset.sum_const_zero, add_zero]
+  erw [boolCompleteGraph_degree_sum]
+  simp
 
 /-- For g = 2: two boundary divisor types -/
 theorem boundary_divisors_g2 : 2 / 2 + 1 = 2 := rfl

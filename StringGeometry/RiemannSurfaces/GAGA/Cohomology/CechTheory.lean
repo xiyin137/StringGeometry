@@ -183,27 +183,6 @@ def CechCoboundarySubgroup (n : ℕ) : AddSubgroup (CechCohomology.CechCocycles 
     rw [CechCohomology.cechDiff_neg, hτ]
     rfl⟩
 
-/-- The cocycles form an AddSubgroup of cochains -/
-noncomputable def CechCocycleSubgroup (n : ℕ) :
-    AddSubgroup (CechCohomology.CechCochain F U n) where
-  carrier := { σ | CechCohomology.cechDiff F U n σ = 0 }
-  zero_mem' := CechCohomology.cechDiff_zero F U n
-  add_mem' := fun {a b} ha hb => by
-    simp only [Set.mem_setOf_eq] at *
-    rw [CechCohomology.cechDiff_add, ha, hb, add_zero]
-  neg_mem' := fun {a} ha => by
-    simp only [Set.mem_setOf_eq] at *
-    rw [CechCohomology.cechDiff_neg, ha, neg_zero]
-
-/-- CechCocycles is equivalent to the subgroup carrier -/
-theorem CechCocycles_eq_subgroup (n : ℕ) :
-    CechCohomology.CechCocycles F U n = (CechCocycleSubgroup F U n).carrier := rfl
-
-/-- AddCommGroup instance for CechCocycles via AddSubgroup -/
-noncomputable instance instAddCommGroupCechCocycles' (n : ℕ) :
-    AddCommGroup (CechCohomology.CechCocycles F U n) :=
-  (CechCocycleSubgroup F U n).toAddCommGroup
-
 /-- The CechCohomologyRelSucc relation equals the QuotientAddGroup.leftRel -/
 theorem CechCohomologyRelSucc_eq_leftRel (n : ℕ) (a b : CechCohomology.CechCocycles F U (n + 1)) :
     CechCohomology.CechCohomologyRelSucc F U n a b ↔
@@ -677,7 +656,7 @@ private theorem sub_succ_smul_point {RS : RiemannSurface}
   · simp only [mul_one]
     have h1 : ((n + 1 : ℕ) : ℤ) = (n : ℤ) + 1 := by omega
     linarith
-  · simp only [mul_zero, sub_zero]
+  · simp only [mul_zero]; omega
 
 -- Helper: χ(D) - χ(D - n • p) = n for n : ℕ
 private theorem chi_diff_nat_cech {CRS : CompactRiemannSurface}
@@ -689,7 +668,7 @@ private theorem chi_diff_nat_cech {CRS : CompactRiemannSurface}
   induction n with
   | zero =>
     have h : D - (0 : ℤ) • Divisor.point p = D := by
-      ext q; simp only [Divisor.sub_coeff, Divisor.smul_coeff, zero_mul, sub_zero]
+      ext q; simp only [Divisor.sub_coeff, Divisor.smul_coeff, zero_mul]; omega
     simp only [Nat.cast_zero, h, sub_self]
   | succ k ih =>
     rw [sub_succ_smul_point D p k]
@@ -747,7 +726,10 @@ private theorem chi_deg_base_cech {CRS : CompactRiemannSurface}
     (L : LineBundleSheafAssignment CRS.toRiemannSurface O)
     (gc : ∀ D : Divisor CRS.toRiemannSurface, FiniteGoodCover (L.sheafOf D)) :
     cech_chi L gc 0 - (0 : Divisor CRS.toRiemannSurface).degree = 1 - CRS.genus := by
-  simp only [Divisor.degree_zero, sub_zero]
+  rw [Divisor.degree_zero]
+  have hsub : cech_chi L gc 0 - (0 : ℤ) = cech_chi L gc 0 := by omega
+  rw [hsub]
+  -- Simplify to: cech_chi L gc 0 = 1 - CRS.genus
   -- h⁰(O) = 1, h¹(O) = g from the structure theorems
   have h0 := h0_structure_cech L gc
   have h1 := h1_structure_cech L gc

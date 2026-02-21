@@ -29,7 +29,7 @@ namespace Supermanifolds.Helpers
 /-- (-1 : ℤ) • x = -x in any AddCommGroup with ℤ-module structure -/
 theorem neg_one_zsmul_eq_neg {M : Type*} [AddCommGroup M] (x : M) :
     (-1 : ℤ) • x = -x := by
-  simp only [neg_smul, one_smul]
+  simp
 
 /-- 1 • x = x in any AddCommGroup with ℤ-module structure -/
 theorem one_zsmul_eq_self {M : Type*} [AddCommGroup M] (x : M) :
@@ -40,8 +40,8 @@ theorem neg_one_sq : (-1 : ℤ) * (-1 : ℤ) = 1 := by ring
 
 /-- (-1)^(2n) = 1 -/
 theorem neg_one_pow_even (n : ℕ) : (-1 : ℤ) ^ (2 * n) = 1 := by
-  rw [pow_mul]
-  simp only [pow_two, mul_neg_one, neg_neg, one_pow]
+  have : (-1 : ℤ) ^ 2 = 1 := by norm_num
+  rw [pow_mul, this]; exact _root_.one_pow n
 
 /-- (-1)^(2n+1) = -1 -/
 theorem neg_one_pow_odd (n : ℕ) : (-1 : ℤ) ^ (2 * n + 1) = -1 := by
@@ -54,8 +54,8 @@ theorem neg_one_pow_odd (n : ℕ) : (-1 : ℤ) ^ (2 * n + 1) = -1 := by
 
 /-- In a ring, integer scalar multiplication equals multiplication by the integer -/
 theorem ring_zsmul_eq_mul {R : Type*} [Ring R] (n : ℤ) (x : R) :
-    n • x = n * x := by
-  simp only [zsmul_eq_mul]
+    n • x = (n : R) * x := by
+  rw [← smul_one_mul, Int.smul_one_eq_cast]
 
 /-- x = -x implies 2x = 0 -/
 theorem eq_neg_self_iff {M : Type*} [AddCommGroup M] (x : M) :
@@ -88,7 +88,9 @@ theorem eq_neg_self_implies_zero {R : Type*} [Ring R] [NoZeroDivisors R] [CharZe
 
 /-- The only elements of ZMod 2 are 0 and 1 -/
 theorem zmod2_cases (x : ZMod 2) : x = 0 ∨ x = 1 := by
-  fin_cases x <;> simp
+  fin_cases x
+  · left; rfl
+  · right; rfl
 
 /-- x + x = 0 in ZMod 2 -/
 theorem zmod2_add_self (x : ZMod 2) : x + x = 0 := by

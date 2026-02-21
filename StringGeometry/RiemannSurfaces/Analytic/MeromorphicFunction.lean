@@ -294,8 +294,9 @@ noncomputable def inv (f : AnalyticMeromorphicFunction RS) : AnalyticMeromorphic
     · intro h
       -- f.order p < 0, so -f.order p > 0
       -- inv.toFun checks: f.order p > 0? No. f.order p < 0? Yes → Sum.inl 0
+      have hlt : f.order p < 0 := by omega
       have hnotgt : ¬(f.order p > 0) := by omega
-      simp only [hnotgt, ↓reduceIte, h, ↓reduceIte]
+      simp only [hlt, hnotgt, ite_true, ite_false]
     · intro h
       by_contra hge
       push_neg at hge
@@ -304,7 +305,7 @@ noncomputable def inv (f : AnalyticMeromorphicFunction RS) : AnalyticMeromorphic
         -- h : Sum.inr () = Sum.inl 0, contradiction
         cases h
       · push_neg at hgt
-        have heq : f.order p = 0 := le_antisymm hgt hge
+        have heq : f.order p = 0 := by omega
         simp only [heq, lt_self_iff_false, ↓reduceIte] at h
         -- Now the match is used
         cases hf : f.toFun p with

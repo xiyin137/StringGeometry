@@ -1,0 +1,25 @@
+# Lake build artifacts
+/build/
+/lake-packages/
+/.lake/
+lake-manifest.json
+
+# Lean tooling
+/.elan/
+
+# OS files
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+
+# References
+/references/
+
+# Claude
+.claude/settings.local.json
+CLAUDE.md
+.claude/CLAUDE.md

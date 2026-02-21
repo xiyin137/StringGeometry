@@ -4,6 +4,8 @@ import Mathlib.Analysis.Calculus.FDeriv.Prod
 import Mathlib.Analysis.Calculus.FDeriv.Mul
 import Mathlib.Analysis.Calculus.FDeriv.Comp
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
+import Mathlib.Analysis.Calculus.FDeriv.RestrictScalars
+import Mathlib.LinearAlgebra.Complex.Module
 import StringGeometry.RiemannSurfaces.Analytic.HodgeTheory.Infrastructure.RealSmoothness
 
 /-!
@@ -47,6 +49,30 @@ namespace RiemannSurfaces.Analytic.Infrastructure
 
 open Complex
 
+-- The `module` keyword in Mathlib's FDeriv files can block instance synthesis for
+-- SMulCommClass ℝ ℂ ℂ (which should come from Algebra.to_smulCommClass).
+-- We provide it explicitly here, constructing from commutativity of ℂ.
+instance instSMulCommClassRealComplexComplex : SMulCommClass ℝ ℂ ℂ :=
+  ⟨fun r c x => by
+    simp only [smul_eq_mul]
+    exact mul_left_comm (↑r) c x⟩
+
+-- Similarly, IsScalarTower ℝ ℂ ℂ and CompatibleSMul ℂ ℂ ℝ ℂ are blocked by the same
+-- module keyword issue. Provide them explicitly.
+instance instIsScalarTowerRealComplexComplex : IsScalarTower ℝ ℂ ℂ where
+  smul_assoc r c x := by
+    simp only [Algebra.smul_def, Algebra.algebraMap_self_apply, mul_assoc]
+
+/-- Left multiplication by c as an ℝ-continuous linear map.
+    Used to bypass `fderiv_const_smul` which needs the unsynthesizable
+    `Module ℂ (ℂ →L[ℝ] ℂ)` instance in this Lean/Mathlib version. -/
+private def mulLeftCLM (c : ℂ) : ℂ →L[ℝ] ℂ where
+  toFun := (c * ·)
+  map_add' := mul_add c
+  map_smul' := fun r w => by
+    simp only [RingHom.id_apply]
+    exact Algebra.mul_smul_comm r c w
+
 /-!
 ## Wirtinger Derivatives via Fréchet Derivative
 
@@ -64,15 +90,13 @@ The function f is ℂ-differentiable iff B = 0.
     This is the holomorphic part of the derivative. When f is ℂ-differentiable,
     this equals deriv f z. -/
 noncomputable def wirtingerDeriv (f : ℂ → ℂ) (z : ℂ) : ℂ :=
-  let L := fderiv ℝ f z
-  (1/2 : ℂ) * (L 1 - Complex.I * L Complex.I)
+  (1/2 : ℂ) * (fderiv ℝ f z 1 - Complex.I * fderiv ℝ f z Complex.I)
 
 /-- The Wirtinger derivative ∂f/∂z̄ = (1/2)(L(1) + i·L(i)) where L = fderiv ℝ f z.
     This is the antiholomorphic part of the derivative.
     A function is holomorphic iff this vanishes. -/
 noncomputable def wirtingerDerivBar (f : ℂ → ℂ) (z : ℂ) : ℂ :=
-  let L := fderiv ℝ f z
-  (1/2 : ℂ) * (L 1 + Complex.I * L Complex.I)
+  (1/2 : ℂ) * (fderiv ℝ f z 1 + Complex.I * fderiv ℝ f z Complex.I)
 
 /-!
 ## The Fundamental Characterization Theorem
@@ -82,7 +106,7 @@ The key result: f is ℂ-differentiable iff ∂f/∂z̄ = 0.
 
 /-- Helper: The Cauchy-Riemann condition L(I) = I·L(1) is equivalent to ∂f/∂z̄ = 0. -/
 theorem wirtingerDerivBar_eq_zero_iff_cauchyRiemann {f : ℂ → ℂ} {z : ℂ}
-    (hf : DifferentiableAt ℝ f z) :
+    (_hf : DifferentiableAt ℝ f z) :
     wirtingerDerivBar f z = 0 ↔ fderiv ℝ f z Complex.I = Complex.I • fderiv ℝ f z 1 := by
   unfold wirtingerDerivBar
   constructor
@@ -140,30 +164,28 @@ theorem holomorphic_iff_wirtingerDerivBar_zero {f : ℂ → ℂ} {z : ℂ} :
 /-- When f is ℂ-differentiable, ∂f/∂z equals the complex derivative. -/
 theorem wirtingerDeriv_eq_deriv {f : ℂ → ℂ} {z : ℂ} (hf : DifferentiableAt ℂ f z) :
     wirtingerDeriv f z = deriv f z := by
-  unfold wirtingerDeriv
-  have hfR := hf.restrictScalars ℝ
-  have hres := hf.fderiv_restrictScalars ℝ
-  rw [hres]
-  -- fderiv ℂ f z is complex-linear, so (fderiv ℂ f z)(I) = I · (fderiv ℂ f z)(1)
-  have hlin : (fderiv ℂ f z).restrictScalars ℝ Complex.I =
-      Complex.I * (fderiv ℂ f z).restrictScalars ℝ 1 := by
-    simp only [ContinuousLinearMap.coe_restrictScalars']
-    have : (fderiv ℂ f z) Complex.I = (fderiv ℂ f z) (Complex.I • 1) := by simp
-    rw [this, ContinuousLinearMap.map_smul, smul_eq_mul]
-  -- Now L(1) - I · L(I) = L(1) - I · I · L(1) = L(1) + L(1) = 2 · L(1)
+  -- Expand the definition without introducing let-binding
+  show (1/2 : ℂ) * (fderiv ℝ f z 1 - Complex.I * fderiv ℝ f z Complex.I) = deriv f z
+  -- The key is that ℂ-differentiability implies the Cauchy-Riemann equation
+  -- L(I) = I * L(1) where L = fderiv ℝ f z
+  have hCR : fderiv ℝ f z Complex.I = Complex.I • fderiv ℝ f z 1 := by
+    rw [differentiableAt_complex_iff_differentiableAt_real] at hf
+    exact hf.2
+  -- From Cauchy-Riemann: L(1) - I * L(I) = L(1) - I * (I * L(1)) = 2 * L(1)
   have hIsq : Complex.I * Complex.I = -1 := Complex.I_mul_I
-  calc (1/2 : ℂ) * ((fderiv ℂ f z).restrictScalars ℝ 1 -
-                    Complex.I * (fderiv ℂ f z).restrictScalars ℝ Complex.I)
-    _ = (1/2 : ℂ) * ((fderiv ℂ f z).restrictScalars ℝ 1 -
-                    Complex.I * (Complex.I * (fderiv ℂ f z).restrictScalars ℝ 1)) := by rw [hlin]
-    _ = (1/2 : ℂ) * ((fderiv ℂ f z).restrictScalars ℝ 1 -
-                    (Complex.I * Complex.I) * (fderiv ℂ f z).restrictScalars ℝ 1) := by ring
-    _ = (1/2 : ℂ) * ((fderiv ℂ f z).restrictScalars ℝ 1 -
-                    (-1) * (fderiv ℂ f z).restrictScalars ℝ 1) := by rw [hIsq]
-    _ = (1/2 : ℂ) * (2 * (fderiv ℂ f z).restrictScalars ℝ 1) := by ring
-    _ = (fderiv ℂ f z).restrictScalars ℝ 1 := by ring
-    _ = (fderiv ℂ f z) 1 := rfl
-    _ = deriv f z := fderiv_apply_one_eq_deriv
+  rw [hCR, smul_eq_mul]
+  -- wirtingerDeriv = (1/2)(L(1) - I * I * L(1)) = (1/2)(2 * L(1)) = L(1)
+  calc (1/2 : ℂ) * (fderiv ℝ f z 1 - Complex.I * (Complex.I * fderiv ℝ f z 1))
+    _ = (1/2 : ℂ) * (fderiv ℝ f z 1 - (Complex.I * Complex.I) * fderiv ℝ f z 1) := by ring
+    _ = (1/2 : ℂ) * (fderiv ℝ f z 1 - (-1) * fderiv ℝ f z 1) := by rw [hIsq]
+    _ = fderiv ℝ f z 1 := by ring
+    _ = deriv f z := by
+        -- fderiv ℝ f z 1 = deriv f z when f is ℂ-differentiable
+        -- Use that fderiv ℝ f z = (fderiv ℂ f z).restrictScalars ℝ
+        -- and (fderiv ℂ f z) 1 = deriv f z
+        rw [@DifferentiableAt.fderiv_restrictScalars ℝ _ ℂ _ _ ℂ _ _ _
+            IsScalarTower.right ℂ _ _ _ IsScalarTower.right _ _ hf]
+        exact fderiv_apply_one_eq_deriv
 
 /-!
 ## Algebraic Properties of Wirtinger Derivatives
@@ -189,21 +211,36 @@ theorem wirtingerDerivBar_add (hf : DifferentiableAt ℝ f z) (hg : Differentiab
   simp only [ContinuousLinearMap.add_apply]
   ring
 
+/-- Helper: For a constant c and ℝ-differentiable f, fderiv of c * f applied to v.
+    Uses `mulLeftCLM` composition to avoid `fderiv_const_smul` which needs
+    the unsynthesizable `Module ℂ (ℂ →L[ℝ] ℂ)`. -/
+private theorem fderiv_const_mul_apply' {f : ℂ → ℂ} {z : ℂ}
+    (hf : DifferentiableAt ℝ f z) (c : ℂ) (v : ℂ) :
+    fderiv ℝ (fun w => c * f w) z v = c * fderiv ℝ f z v := by
+  -- Express c * f w as composition: mulLeftCLM(c) ∘ f
+  have key : fderiv ℝ (fun w => c * f w) z = (mulLeftCLM c).comp (fderiv ℝ f z) := by
+    have h := ((mulLeftCLM c).hasFDerivAt.comp z hf.hasFDerivAt).fderiv
+    rwa [show (↑(mulLeftCLM c) ∘ f) = (fun w => c * f w) from rfl] at h
+  rw [key]; rfl
+
 /-- Wirtinger derivative of constant multiple. -/
 theorem wirtingerDeriv_const_smul (c : ℂ) (hf : DifferentiableAt ℝ f z) :
     wirtingerDeriv (c • f) z = c * wirtingerDeriv f z := by
-  unfold wirtingerDeriv
-  rw [fderiv_const_smul hf]
-  simp only [ContinuousLinearMap.coe_smul', Pi.smul_apply, smul_eq_mul]
-  ring
+  -- c • f = fun w => c * f w
+  show wirtingerDeriv (fun w => c * f w) z = c * wirtingerDeriv f z
+  show (1/2 : ℂ) * (fderiv ℝ (fun w => c * f w) z 1 -
+    Complex.I * fderiv ℝ (fun w => c * f w) z Complex.I) =
+    c * ((1/2 : ℂ) * (fderiv ℝ f z 1 - Complex.I * fderiv ℝ f z Complex.I))
+  rw [fderiv_const_mul_apply' hf, fderiv_const_mul_apply' hf]; ring
 
 /-- Wirtinger bar derivative of constant multiple. -/
 theorem wirtingerDerivBar_const_smul (c : ℂ) (hf : DifferentiableAt ℝ f z) :
     wirtingerDerivBar (c • f) z = c * wirtingerDerivBar f z := by
-  unfold wirtingerDerivBar
-  rw [fderiv_const_smul hf]
-  simp only [ContinuousLinearMap.coe_smul', Pi.smul_apply, smul_eq_mul]
-  ring
+  show wirtingerDerivBar (fun w => c * f w) z = c * wirtingerDerivBar f z
+  show (1/2 : ℂ) * (fderiv ℝ (fun w => c * f w) z 1 +
+    Complex.I * fderiv ℝ (fun w => c * f w) z Complex.I) =
+    c * ((1/2 : ℂ) * (fderiv ℝ f z 1 + Complex.I * fderiv ℝ f z Complex.I))
+  rw [fderiv_const_mul_apply' hf, fderiv_const_mul_apply' hf]; ring
 
 /-- Wirtinger derivative of negation. -/
 theorem wirtingerDeriv_neg :
@@ -254,22 +291,39 @@ theorem wirtingerDerivBar_id : wirtingerDerivBar id z = 0 := by
     _ = 1 / 2 * (1 + (-1)) := by rw [hIsq]
     _ = 0 := by ring
 
+/-- Value-level product rule for fderiv, bypassing `fderiv_mul`'s `<•` (RightActions) notation
+    which requires the unsynthesizable `Module ℂ (ℂ →L[ℝ] ℂ)`.
+    Uses `IsBoundedBilinearMap` for multiplication composed via chain rule. -/
+private theorem fderiv_mul_apply (hf : DifferentiableAt ℝ f z) (hg : DifferentiableAt ℝ g z)
+    (v : ℂ) :
+    fderiv ℝ (fun w => f w * g w) z v = f z * fderiv ℝ g z v + fderiv ℝ f z v * g z := by
+  have B := isBoundedBilinearMap_mul (𝕜 := ℝ) (A := ℂ)
+  -- Compute fderiv at the CLM level first, then evaluate at v
+  have key : fderiv ℝ (fun w => f w * g w) z =
+      (B.deriv (f z, g z)).comp ((fderiv ℝ f z).prod (fderiv ℝ g z)) := by
+    have hfg := DifferentiableAt.prodMk hf hg
+    rw [show (fun w => f w * g w) = (fun p : ℂ × ℂ => p.1 * p.2) ∘ (fun w => (f w, g w)) from rfl,
+        fderiv_comp z (B.differentiableAt _) hfg,
+        B.fderiv, DifferentiableAt.fderiv_prodMk hf hg]
+  rw [key, ContinuousLinearMap.comp_apply, ContinuousLinearMap.prod_apply]
+  simp [IsBoundedBilinearMap.deriv_apply]
+
 /-- Product rule for Wirtinger derivatives (Leibniz rule).
     This is the standard product rule: ∂(fg)/∂z = (∂f/∂z)g + f(∂g/∂z). -/
 theorem wirtingerDeriv_mul (hf : DifferentiableAt ℝ f z) (hg : DifferentiableAt ℝ g z) :
     wirtingerDeriv (f * g) z = wirtingerDeriv f z * g z + f z * wirtingerDeriv g z := by
+  show wirtingerDeriv (fun w => f w * g w) z = _
   unfold wirtingerDeriv
-  rw [fderiv_mul hf hg]
-  simp only [ContinuousLinearMap.add_apply, ContinuousLinearMap.smul_apply, smul_eq_mul]
+  simp only [fderiv_mul_apply hf hg]
   ring
 
 /-- Product rule for Wirtinger bar derivatives (Leibniz rule).
     This is the standard product rule: ∂(fg)/∂z̄ = (∂f/∂z̄)g + f(∂g/∂z̄). -/
 theorem wirtingerDerivBar_mul (hf : DifferentiableAt ℝ f z) (hg : DifferentiableAt ℝ g z) :
     wirtingerDerivBar (f * g) z = wirtingerDerivBar f z * g z + f z * wirtingerDerivBar g z := by
+  show wirtingerDerivBar (fun w => f w * g w) z = _
   unfold wirtingerDerivBar
-  rw [fderiv_mul hf hg]
-  simp only [ContinuousLinearMap.add_apply, ContinuousLinearMap.smul_apply, smul_eq_mul]
+  simp only [fderiv_mul_apply hf hg]
   ring
 
 /-- Simplified product rule when both functions are holomorphic. -/
@@ -294,17 +348,16 @@ theorem wirtingerDeriv_conj : wirtingerDeriv (starRingEnd ℂ) z = 0 := by
     apply HasFDerivAt.fderiv
     exact RiemannSurfaces.Analytic.conjCLM.hasFDerivAt
   rw [h]
-  simp only [RiemannSurfaces.Analytic.conjCLM, ContinuousLinearMap.coe_mk', LinearMap.coe_mk,
-    AddHom.coe_mk, map_one]
-  -- conj(I) = -I
-  have hconj : star Complex.I = -Complex.I := Complex.conj_I
-  have hIsq : Complex.I * Complex.I = -1 := Complex.I_mul_I
-  calc (1 : ℂ) / 2 * (1 - Complex.I * star Complex.I)
-    _ = 1 / 2 * (1 - Complex.I * (-Complex.I)) := by rw [hconj]
-    _ = 1 / 2 * (1 - (-(Complex.I * Complex.I))) := by ring
-    _ = 1 / 2 * (1 - (-(-1))) := by rw [hIsq]
-    _ = 1 / 2 * 0 := by ring
-    _ = 0 := by ring
+  -- conjCLM = conjCLE.toContinuousLinearMap; use erw to handle coercion
+  have h1 : (RiemannSurfaces.Analytic.conjCLM : ℂ →L[ℝ] ℂ) 1 = 1 := by
+    show Complex.conjCLE.toContinuousLinearMap 1 = 1
+    erw [conjCLE_apply]; simp
+  have hI : (RiemannSurfaces.Analytic.conjCLM : ℂ →L[ℝ] ℂ) Complex.I = -Complex.I := by
+    show Complex.conjCLE.toContinuousLinearMap Complex.I = -Complex.I
+    erw [conjCLE_apply]; exact Complex.conj_I
+  rw [h1, hI]
+  have : Complex.I * -Complex.I = 1 := by rw [mul_neg, Complex.I_mul_I, neg_neg]
+  rw [this]; ring
 
 /-- Wirtinger bar derivative of conjugation: ∂(conj)/∂z̄ = 1.
     This shows conjugation is a "purely antiholomorphic" function. -/
@@ -314,20 +367,50 @@ theorem wirtingerDerivBar_conj : wirtingerDerivBar (starRingEnd ℂ) z = 1 := by
     apply HasFDerivAt.fderiv
     exact RiemannSurfaces.Analytic.conjCLM.hasFDerivAt
   rw [h]
-  simp only [RiemannSurfaces.Analytic.conjCLM, ContinuousLinearMap.coe_mk', LinearMap.coe_mk,
-    AddHom.coe_mk, map_one]
-  have hconj : star Complex.I = -Complex.I := Complex.conj_I
-  have hIsq : Complex.I * Complex.I = -1 := Complex.I_mul_I
-  calc (1 : ℂ) / 2 * (1 + Complex.I * star Complex.I)
-    _ = 1 / 2 * (1 + Complex.I * (-Complex.I)) := by rw [hconj]
-    _ = 1 / 2 * (1 + (-(Complex.I * Complex.I))) := by ring
-    _ = 1 / 2 * (1 + (-(-1))) := by rw [hIsq]
-    _ = 1 / 2 * 2 := by ring
-    _ = 1 := by ring
+  have h1 : (RiemannSurfaces.Analytic.conjCLM : ℂ →L[ℝ] ℂ) 1 = 1 := by
+    show Complex.conjCLE.toContinuousLinearMap 1 = 1
+    erw [conjCLE_apply]; simp
+  have hI : (RiemannSurfaces.Analytic.conjCLM : ℂ →L[ℝ] ℂ) Complex.I = -Complex.I := by
+    show Complex.conjCLE.toContinuousLinearMap Complex.I = -Complex.I
+    erw [conjCLE_apply]; exact Complex.conj_I
+  rw [h1, hI]
+  have : Complex.I * -Complex.I = 1 := by rw [mul_neg, Complex.I_mul_I, neg_neg]
+  rw [this]; ring
 
-/-- Chain rule for wirtingerDerivBar with conjugation: ∂(conj ∘ g)/∂z̄ = conj(∂g/∂z).
-    When g is ℂ-differentiable, composing with conjugation swaps the roles of
-    wirtingerDeriv and wirtingerDerivBar. -/
+/-- For a ℂ-differentiable function, construct HasFDerivAt over ℝ directly,
+    bypassing restrictScalars (which has an instance diamond with the `module` keyword). -/
+private theorem hasFDerivAt_real_of_complex {g : ℂ → ℂ} {z : ℂ}
+    (hg : DifferentiableAt ℂ g z) :
+    HasFDerivAt (𝕜 := ℝ) g (mulLeftCLM (deriv g z)) z := by
+  -- Key: mulLeftCLM (deriv g z) and fderiv ℂ g z agree pointwise
+  have heq : ∀ h : ℂ, mulLeftCLM (deriv g z) h = (fderiv ℂ g z) h := by
+    intro h
+    show (deriv g z) * h = (fderiv ℂ g z) h
+    have : (fderiv ℂ g z) h = h * deriv g z := by
+      have hsm := (fderiv ℂ g z).map_smul h (1 : ℂ)
+      simp only [smul_eq_mul, mul_one] at hsm
+      rw [hsm, fderiv_apply_one_eq_deriv]
+    rw [this, mul_comm]
+  -- Transfer the isLittleO condition (HasFDerivAt uses pairs p.1, p.2 in this Mathlib version)
+  show HasFDerivAtFilter g (mulLeftCLM (deriv g z)) (nhds z ×ˢ pure z)
+  refine HasFDerivAtFilter.of_isLittleO ?_
+  have key : ∀ p : ℂ × ℂ,
+      g p.1 - g p.2 - mulLeftCLM (deriv g z) (p.1 - p.2) =
+      g p.1 - g p.2 - (fderiv ℂ g z) (p.1 - p.2) := fun p => by rw [heq]
+  simp_rw [key]
+  exact HasFDerivAtFilter.isLittleO hg.hasFDerivAt
+
+/-- ℂ-differentiable implies ℝ-differentiable (bypasses restrictScalars diamond). -/
+private theorem differentiableAt_real_of_complex {g : ℂ → ℂ} {z : ℂ}
+    (hg : DifferentiableAt ℂ g z) : DifferentiableAt ℝ g z :=
+  (hasFDerivAt_real_of_complex hg).differentiableAt
+
+/-- For ℂ-differentiable g, fderiv ℝ g z = mulLeftCLM (deriv g z). -/
+private theorem fderiv_real_eq_mulLeftCLM {g : ℂ → ℂ} {z : ℂ}
+    (hg : DifferentiableAt ℂ g z) :
+    fderiv ℝ g z = mulLeftCLM (deriv g z) :=
+  (hasFDerivAt_real_of_complex hg).fderiv
+
 theorem wirtingerDerivBar_comp_conj {g : ℂ → ℂ} {z : ℂ} (hg : DifferentiableAt ℂ g z) :
     wirtingerDerivBar (starRingEnd ℂ ∘ g) z = starRingEnd ℂ (wirtingerDeriv g z) := by
   -- Rewrite RHS using wirtingerDeriv = deriv for holomorphic functions
@@ -335,35 +418,26 @@ theorem wirtingerDerivBar_comp_conj {g : ℂ → ℂ} {z : ℂ} (hg : Differenti
   -- Expand wirtingerDerivBar to work with fderiv directly
   show (1/2 : ℂ) * (fderiv ℝ (starRingEnd ℂ ∘ g) z 1 +
     Complex.I * fderiv ℝ (starRingEnd ℂ ∘ g) z Complex.I) = starRingEnd ℂ (deriv g z)
-  -- Step 1: Chain rule for fderiv (use HasFDerivAt to handle coercion matching)
-  have hgR : DifferentiableAt ℝ g z := hg.restrictScalars ℝ
+  -- Step 1: Chain rule for fderiv
+  have hgR : DifferentiableAt ℝ g z := differentiableAt_real_of_complex hg
   have hfderiv_chain : fderiv ℝ (starRingEnd ℂ ∘ g) z =
       (RiemannSurfaces.Analytic.conjCLM).comp (fderiv ℝ g z) := by
     apply HasFDerivAt.fderiv
     exact RiemannSurfaces.Analytic.conjCLM.hasFDerivAt.comp z hgR.hasFDerivAt
-  -- Step 2: Express fderiv ℝ g z using ℂ-linear structure
-  have hres : fderiv ℝ g z = (fderiv ℂ g z).restrictScalars ℝ := hg.fderiv_restrictScalars ℝ
+  -- Step 2: Express fderiv ℝ g z using mulLeftCLM (bypasses restrictScalars)
+  have hfderiv_eq : fderiv ℝ g z = mulLeftCLM (deriv g z) := fderiv_real_eq_mulLeftCLM hg
   -- Step 3: Evaluate the composed fderiv at 1 and I
   have heval_1 : fderiv ℝ (starRingEnd ℂ ∘ g) z 1 = starRingEnd ℂ (deriv g z) := by
-    rw [hfderiv_chain]
-    simp only [ContinuousLinearMap.comp_apply, hres, ContinuousLinearMap.coe_restrictScalars']
-    change starRingEnd ℂ ((fderiv ℂ g z) 1) = _
-    rw [fderiv_apply_one_eq_deriv]
+    rw [hfderiv_chain, ContinuousLinearMap.comp_apply, hfderiv_eq]
+    show starRingEnd ℂ ((deriv g z) * 1) = _
+    rw [mul_one]
   have heval_I : fderiv ℝ (starRingEnd ℂ ∘ g) z Complex.I =
       -Complex.I * starRingEnd ℂ (deriv g z) := by
-    rw [hfderiv_chain]
-    simp only [ContinuousLinearMap.comp_apply, hres, ContinuousLinearMap.coe_restrictScalars']
-    change starRingEnd ℂ ((fderiv ℂ g z) Complex.I) = _
-    -- ℂ-linearity: (fderiv ℂ g z) I = I • (fderiv ℂ g z) 1 = I * deriv g z
-    have hlin : (fderiv ℂ g z) Complex.I = Complex.I * deriv g z := by
-      calc (fderiv ℂ g z) Complex.I
-        _ = (fderiv ℂ g z) (Complex.I • 1) := by simp
-        _ = Complex.I • (fderiv ℂ g z) 1 := ContinuousLinearMap.map_smul _ _ _
-        _ = Complex.I * deriv g z := by rw [smul_eq_mul, fderiv_apply_one_eq_deriv]
-    rw [hlin, map_mul (starRingEnd ℂ), Complex.conj_I]
+    rw [hfderiv_chain, ContinuousLinearMap.comp_apply, hfderiv_eq]
+    show starRingEnd ℂ ((deriv g z) * Complex.I) = _
+    rw [map_mul (starRingEnd ℂ), Complex.conj_I, mul_comm]
   -- Step 4: Substitute and simplify
   rw [heval_1, heval_I]
-  -- Goal: (1/2) * (conj(g') + I * (-I * conj(g'))) = conj(g')
   have : Complex.I * (-Complex.I * starRingEnd ℂ (deriv g z)) = starRingEnd ℂ (deriv g z) := by
     rw [← mul_assoc, mul_neg, Complex.I_mul_I, neg_neg, one_mul]
   rw [this]; ring
@@ -374,31 +448,22 @@ theorem wirtingerDeriv_comp_conj {g : ℂ → ℂ} {z : ℂ} (hg : Differentiabl
     wirtingerDeriv (starRingEnd ℂ ∘ g) z = 0 := by
   show (1/2 : ℂ) * (fderiv ℝ (starRingEnd ℂ ∘ g) z 1 -
     Complex.I * fderiv ℝ (starRingEnd ℂ ∘ g) z Complex.I) = 0
-  -- Reuse chain rule computation from wirtingerDerivBar_comp_conj
-  have hgR : DifferentiableAt ℝ g z := hg.restrictScalars ℝ
+  have hgR : DifferentiableAt ℝ g z := differentiableAt_real_of_complex hg
   have hfderiv_chain : fderiv ℝ (starRingEnd ℂ ∘ g) z =
       (RiemannSurfaces.Analytic.conjCLM).comp (fderiv ℝ g z) := by
     apply HasFDerivAt.fderiv
     exact RiemannSurfaces.Analytic.conjCLM.hasFDerivAt.comp z hgR.hasFDerivAt
-  have hres : fderiv ℝ g z = (fderiv ℂ g z).restrictScalars ℝ := hg.fderiv_restrictScalars ℝ
+  have hfderiv_eq : fderiv ℝ g z = mulLeftCLM (deriv g z) := fderiv_real_eq_mulLeftCLM hg
   have heval_1 : fderiv ℝ (starRingEnd ℂ ∘ g) z 1 = starRingEnd ℂ (deriv g z) := by
-    rw [hfderiv_chain]
-    simp only [ContinuousLinearMap.comp_apply, hres, ContinuousLinearMap.coe_restrictScalars']
-    change starRingEnd ℂ ((fderiv ℂ g z) 1) = _
-    rw [fderiv_apply_one_eq_deriv]
+    rw [hfderiv_chain, ContinuousLinearMap.comp_apply, hfderiv_eq]
+    show starRingEnd ℂ ((deriv g z) * 1) = _
+    rw [mul_one]
   have heval_I : fderiv ℝ (starRingEnd ℂ ∘ g) z Complex.I =
       -Complex.I * starRingEnd ℂ (deriv g z) := by
-    rw [hfderiv_chain]
-    simp only [ContinuousLinearMap.comp_apply, hres, ContinuousLinearMap.coe_restrictScalars']
-    change starRingEnd ℂ ((fderiv ℂ g z) Complex.I) = _
-    have hlin : (fderiv ℂ g z) Complex.I = Complex.I * deriv g z := by
-      calc (fderiv ℂ g z) Complex.I
-        _ = (fderiv ℂ g z) (Complex.I • 1) := by simp
-        _ = Complex.I • (fderiv ℂ g z) 1 := ContinuousLinearMap.map_smul _ _ _
-        _ = Complex.I * deriv g z := by rw [smul_eq_mul, fderiv_apply_one_eq_deriv]
-    rw [hlin, map_mul (starRingEnd ℂ), Complex.conj_I]
+    rw [hfderiv_chain, ContinuousLinearMap.comp_apply, hfderiv_eq]
+    show starRingEnd ℂ ((deriv g z) * Complex.I) = _
+    rw [map_mul (starRingEnd ℂ), Complex.conj_I, mul_comm]
   rw [heval_1, heval_I]
-  -- Goal: (1/2) * (conj(g') - I * (-I * conj(g'))) = 0
   have : Complex.I * (-Complex.I * starRingEnd ℂ (deriv g z)) = starRingEnd ℂ (deriv g z) := by
     rw [← mul_assoc, mul_neg, Complex.I_mul_I, neg_neg, one_mul]
   rw [this]; ring
@@ -429,7 +494,9 @@ theorem differentiableAt_chart_comp {M : Type*} [TopologicalSpace M] [ChartedSpa
   rw [contMDiffAt_iff_of_mem_source hp_source hfp_source] at hCM
   obtain ⟨_, hcdiff⟩ := hCM
   -- For target ℂ (model space), extChartAt is identity
-  have htarget : extChartAt 𝓘(ℝ, ℂ) (f p) = PartialEquiv.refl ℂ := by simp only [mfld_simps]
+  have htarget : extChartAt 𝓘(ℝ, ℂ) (f p) = PartialEquiv.refl ℂ := by
+    simp only [extChartAt, chartAt_self_eq, OpenPartialHomeomorph.refl_partialEquiv,
+      modelWithCornersSelf_partialEquiv, PartialEquiv.refl_trans, mfld_simps]
   -- For source, use extend_coe_symm: (f.extend I).symm = f.symm ∘ I.symm
   -- For 𝓘(ℝ, ℂ), I.symm = id, so (extChartAt).symm = chartAt.symm
   have hsource_symm : ∀ z, (extChartAt 𝓘(ℝ, ℂ) p).symm z = (chartAt ℂ p).symm z := by
@@ -466,7 +533,9 @@ theorem differentiableAt_chart_comp_of_contMDiffAt {M : Type*} [TopologicalSpace
   rw [contMDiffAt_iff_of_mem_source hp_source hfp_source] at hf
   obtain ⟨_, hcdiff⟩ := hf
   -- For target ℂ (model space), extChartAt is identity
-  have htarget : extChartAt 𝓘(ℝ, ℂ) (f p) = PartialEquiv.refl ℂ := by simp only [mfld_simps]
+  have htarget : extChartAt 𝓘(ℝ, ℂ) (f p) = PartialEquiv.refl ℂ := by
+    simp only [extChartAt, chartAt_self_eq, OpenPartialHomeomorph.refl_partialEquiv,
+      modelWithCornersSelf_partialEquiv, PartialEquiv.refl_trans, mfld_simps]
   -- For source, use extend_coe_symm: (f.extend I).symm = f.symm ∘ I.symm
   have hsource_symm : ∀ z, (extChartAt 𝓘(ℝ, ℂ) p).symm z = (chartAt ℂ p).symm z := by
     intro z
@@ -520,9 +589,9 @@ theorem wirtingerDerivBar_contDiff {f : ℂ → ℂ} {n : ℕ∞}
   have hfderiv : ContDiff ℝ n (fun z => fderiv ℝ f z) := hf.fderiv_right le_rfl
   -- Evaluation at a fixed vector is a CLM, hence smooth
   have heval1 : ContDiff ℝ n (fun z => fderiv ℝ f z 1) :=
-    (evalCLM 1).contDiff.comp hfderiv
+    hfderiv.clm_apply contDiff_const
   have hevalI : ContDiff ℝ n (fun z => fderiv ℝ f z Complex.I) :=
-    (evalCLM Complex.I).contDiff.comp hfderiv
+    hfderiv.clm_apply contDiff_const
   -- Combine with scalar multiplication and addition
   have hsum : ContDiff ℝ n (fun z => fderiv ℝ f z 1 + Complex.I * fderiv ℝ f z Complex.I) :=
     heval1.add (contDiff_const.mul hevalI)
@@ -534,9 +603,9 @@ theorem wirtingerDeriv_contDiff {f : ℂ → ℂ} {n : ℕ∞}
   unfold wirtingerDeriv
   have hfderiv : ContDiff ℝ n (fun z => fderiv ℝ f z) := hf.fderiv_right le_rfl
   have heval1 : ContDiff ℝ n (fun z => fderiv ℝ f z 1) :=
-    (evalCLM 1).contDiff.comp hfderiv
+    hfderiv.clm_apply contDiff_const
   have hevalI : ContDiff ℝ n (fun z => fderiv ℝ f z Complex.I) :=
-    (evalCLM Complex.I).contDiff.comp hfderiv
+    hfderiv.clm_apply contDiff_const
   have hdiff : ContDiff ℝ n (fun z => fderiv ℝ f z 1 - Complex.I * fderiv ℝ f z Complex.I) :=
     heval1.sub (contDiff_const.mul hevalI)
   exact contDiff_const.mul hdiff
@@ -639,82 +708,43 @@ theorem laplacian_eq_four_wirtinger_mixed (f : ℂ → ℂ) (z : ℂ)
       (1/2 : ℂ) * (fderiv ℝ f z' 1 - Complex.I * fderiv ℝ f z' Complex.I) := by
     intro z'; unfold wirtingerDeriv; ring
 
-  -- Now we can compute fderiv of wirtingerDerivBar f at z
-  -- We compute directly using the CLM linearity
+  -- Compute fderiv of wirtingerDerivBar f at z using mulLeftCLM-based approach
+  -- to avoid fderiv_const_smul (needs unsynthesizable Module ℂ (ℂ →L[ℝ] ℂ))
   have hfderiv_bar_apply : ∀ u, fderiv ℝ (wirtingerDerivBar f) z u =
       (1/2 : ℂ) * (D2 u 1 + Complex.I * D2 u Complex.I) := by
     intro u
-    -- wirtingerDerivBar f equals our simpler form
-    have heq : wirtingerDerivBar f = fun z' =>
-        (1/2 : ℂ) * (fderiv ℝ f z' 1 + Complex.I * fderiv ℝ f z' Complex.I) := by
-      ext z'; exact heq_bar z'
-    -- Define component functions using smul (•) to match fderiv_const_smul
-    let g1 : ℂ → ℂ := fun w => fderiv ℝ f w 1
-    let gI : ℂ → ℂ := fun w => fderiv ℝ f w Complex.I
-    let g2 : ℂ → ℂ := Complex.I • gI  -- This is fun w => I • gI w = fun w => I * fderiv ℝ f w I
-    -- g2 equals the original form
-    have hg2_eq : g2 = fun w => Complex.I * fderiv ℝ f w Complex.I := by
-      ext w; simp [g2, gI, smul_eq_mul]
-    -- Differentiability
-    have hdiffI_smul : DifferentiableAt ℝ g2 z := hdiffI.const_smul Complex.I
-    have hdiff_sum : DifferentiableAt ℝ (g1 + g2) z := hdiff1.add hdiffI_smul
-    -- fderiv of sum
-    have hfderiv_sum : fderiv ℝ (g1 + g2) z = fderiv ℝ g1 z + fderiv ℝ g2 z :=
-      fderiv_add hdiff1 hdiffI_smul
-    -- fderiv of const • g
-    have hfderiv_g2 : fderiv ℝ g2 z = Complex.I • fderiv ℝ gI z :=
-      fderiv_const_smul hdiffI Complex.I
-    -- Now compute
-    calc fderiv ℝ (wirtingerDerivBar f) z u
-      _ = fderiv ℝ (fun z' => (1/2 : ℂ) * (fderiv ℝ f z' 1 + Complex.I * fderiv ℝ f z' Complex.I)) z u := by
-          rw [heq]
-      _ = fderiv ℝ ((1/2 : ℂ) • (g1 + g2)) z u := by
-          apply congrArg (fun h => fderiv ℝ h z u)
-          ext w; simp only [Pi.smul_apply, Pi.add_apply, smul_eq_mul, g1, g2, gI]
-      _ = ((1/2 : ℂ) • fderiv ℝ (g1 + g2) z) u := by rw [fderiv_const_smul hdiff_sum]
-      _ = (1/2 : ℂ) • (fderiv ℝ (g1 + g2) z u) := rfl
-      _ = (1/2 : ℂ) • ((fderiv ℝ g1 z + fderiv ℝ g2 z) u) := by rw [hfderiv_sum]
-      _ = (1/2 : ℂ) • (fderiv ℝ g1 z u + fderiv ℝ g2 z u) := rfl
-      _ = (1/2 : ℂ) • (D2 u 1 + (Complex.I • fderiv ℝ gI z) u) := by rw [hD2_apply u 1, hfderiv_g2]
-      _ = (1/2 : ℂ) • (D2 u 1 + Complex.I • D2 u Complex.I) := by
-          -- fderiv ℝ gI z = fderiv ℝ (fun w => fderiv ℝ f w Complex.I) z
-          -- and hD2_apply says fderiv ℝ (fun w => fderiv ℝ f w Complex.I) z u = D2 u Complex.I
-          have : fderiv ℝ gI z u = D2 u Complex.I := hD2_apply u Complex.I
-          simp only [ContinuousLinearMap.smul_apply, this]
-      _ = (1/2 : ℂ) * (D2 u 1 + Complex.I * D2 u Complex.I) := by simp only [smul_eq_mul]
+    -- Decompose wirtingerDerivBar f as Pi-sum of const * component
+    have heq3 : wirtingerDerivBar f =
+        (fun w => (1/2 : ℂ) * fderiv ℝ f w 1) +
+        (fun w => (Complex.I / 2) * fderiv ℝ f w Complex.I) := by
+      ext z'; simp only [Pi.add_apply]; rw [heq_bar z']; ring
+    have ha : DifferentiableAt ℝ (fun w => (1/2 : ℂ) * fderiv ℝ f w 1) z :=
+      (mulLeftCLM (1/2)).differentiableAt.comp z hdiff1
+    have hb : DifferentiableAt ℝ (fun w => (Complex.I / 2) * fderiv ℝ f w Complex.I) z :=
+      (mulLeftCLM (Complex.I / 2)).differentiableAt.comp z hdiffI
+    rw [heq3, fderiv_add ha hb, ContinuousLinearMap.add_apply,
+        fderiv_const_mul_apply' hdiff1 (1/2 : ℂ) u,
+        fderiv_const_mul_apply' hdiffI (Complex.I / 2) u,
+        hD2_apply u 1, hD2_apply u Complex.I]
+    ring
 
   have hfderiv_hol_apply : ∀ u, fderiv ℝ (wirtingerDeriv f) z u =
       (1/2 : ℂ) * (D2 u 1 - Complex.I * D2 u Complex.I) := by
     intro u
-    have heq : wirtingerDeriv f = fun z' =>
-        (1/2 : ℂ) * (fderiv ℝ f z' 1 - Complex.I * fderiv ℝ f z' Complex.I) := by
-      ext z'; exact heq_hol z'
-    let g1 : ℂ → ℂ := fun w => fderiv ℝ f w 1
-    let gI : ℂ → ℂ := fun w => fderiv ℝ f w Complex.I
-    let g2 : ℂ → ℂ := Complex.I • gI
-    have hg2_eq : g2 = fun w => Complex.I * fderiv ℝ f w Complex.I := by
-      ext w; simp [g2, gI, smul_eq_mul]
-    have hdiffI_smul : DifferentiableAt ℝ g2 z := hdiffI.const_smul Complex.I
-    have hdiff_sub : DifferentiableAt ℝ (g1 - g2) z := hdiff1.sub hdiffI_smul
-    have hfderiv_sub : fderiv ℝ (g1 - g2) z = fderiv ℝ g1 z - fderiv ℝ g2 z :=
-      fderiv_sub hdiff1 hdiffI_smul
-    have hfderiv_g2 : fderiv ℝ g2 z = Complex.I • fderiv ℝ gI z :=
-      fderiv_const_smul hdiffI Complex.I
-    calc fderiv ℝ (wirtingerDeriv f) z u
-      _ = fderiv ℝ (fun z' => (1/2 : ℂ) * (fderiv ℝ f z' 1 - Complex.I * fderiv ℝ f z' Complex.I)) z u := by
-          rw [heq]
-      _ = fderiv ℝ ((1/2 : ℂ) • (g1 - g2)) z u := by
-          apply congrArg (fun h => fderiv ℝ h z u)
-          ext w; simp only [Pi.smul_apply, Pi.sub_apply, smul_eq_mul, g1, g2, gI]
-      _ = ((1/2 : ℂ) • fderiv ℝ (g1 - g2) z) u := by rw [fderiv_const_smul hdiff_sub]
-      _ = (1/2 : ℂ) • (fderiv ℝ (g1 - g2) z u) := rfl
-      _ = (1/2 : ℂ) • ((fderiv ℝ g1 z - fderiv ℝ g2 z) u) := by rw [hfderiv_sub]
-      _ = (1/2 : ℂ) • (fderiv ℝ g1 z u - fderiv ℝ g2 z u) := rfl
-      _ = (1/2 : ℂ) • (D2 u 1 - (Complex.I • fderiv ℝ gI z) u) := by rw [hD2_apply u 1, hfderiv_g2]
-      _ = (1/2 : ℂ) • (D2 u 1 - Complex.I • D2 u Complex.I) := by
-          have : fderiv ℝ gI z u = D2 u Complex.I := hD2_apply u Complex.I
-          simp only [ContinuousLinearMap.smul_apply, this]
-      _ = (1/2 : ℂ) * (D2 u 1 - Complex.I * D2 u Complex.I) := by simp only [smul_eq_mul]
+    -- Decompose wirtingerDeriv f as Pi-difference of const * component
+    have heq3 : wirtingerDeriv f =
+        (fun w => (1/2 : ℂ) * fderiv ℝ f w 1) -
+        (fun w => (Complex.I / 2) * fderiv ℝ f w Complex.I) := by
+      ext z'; simp only [Pi.sub_apply]; rw [heq_hol z']; ring
+    have ha : DifferentiableAt ℝ (fun w => (1/2 : ℂ) * fderiv ℝ f w 1) z :=
+      (mulLeftCLM (1/2)).differentiableAt.comp z hdiff1
+    have hb : DifferentiableAt ℝ (fun w => (Complex.I / 2) * fderiv ℝ f w Complex.I) z :=
+      (mulLeftCLM (Complex.I / 2)).differentiableAt.comp z hdiffI
+    rw [heq3, fderiv_sub ha hb, ContinuousLinearMap.sub_apply,
+        fderiv_const_mul_apply' hdiff1 (1/2 : ℂ) u,
+        fderiv_const_mul_apply' hdiffI (Complex.I / 2) u,
+        hD2_apply u 1, hD2_apply u Complex.I]
+    ring
 
   -- Now compute both sides
   -- LHS = wirtingerDeriv (wirtingerDerivBar f) z

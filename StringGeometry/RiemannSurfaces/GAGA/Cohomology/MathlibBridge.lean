@@ -519,7 +519,9 @@ theorem H1_skyscraper_vanish (RS : RiemannSurface) (O : StructureSheaf RS)
     funext i j
     simp only [cechDiff0, skyscraperSheaf]
     apply SkyscraperSection.ext
-    simp only [SkyscraperSection.sub_val]
+    -- SkyscraperSection.sub_val simp lemma no longer fires due to instance diamonds;
+    -- use erw to handle definitional equality across Sub instances
+    erw [SkyscraperSection.sub_val]
 
     -- Case split on whether p is in Uij
     by_cases hpij : p ∈ ((cov.opens i).inter (cov.opens j)).carrier
@@ -549,23 +551,22 @@ theorem H1_skyscraper_vanish (RS : RiemannSurface) (O : StructureSheaf RS)
       -- Use cocycle condition at (j₀, i, j)
       have hc : cechDiff1 RS O (skyscraperSheaf O p) U cov τ.val j₀ i j = 0 := by rw [τ.prop]
       simp only [cechDiff1, skyscraperSheaf] at hc
-      have heq := congrArg SkyscraperSection.val hc
-      simp only [SkyscraperSection.zero_val', SkyscraperSection.sub_val, SkyscraperSection.add_val] at heq
-
-      -- The restrictions in heq: all preserve values since p is in triple intersection
+      -- The restrictions in hc: all preserve values since p is in triple intersection
       have hp_j₀ij : p ∈ ((cov.opens j₀).inter ((cov.opens i).inter (cov.opens j))).carrier := ⟨hj₀, hpij⟩
 
-      -- Extract the value equation from heq
-      unfold SkyscraperSection.restrict at heq
-      simp only [hp_j₀ij, ↓reduceDIte] at heq
-      -- heq: (↑τ i j).val - (↑τ j₀ j).val + (↑τ j₀ i).val = 0
-      -- Goal after rewrites: (↑τ j₀ j).val - (↑τ j₀ i).val = (↑τ i j).val
-      -- Direct arithmetic: from a - b + c = 0, we get b - c = a
-      calc (τ.val j₀ j).val - (τ.val j₀ i).val
-          = (τ.val j₀ j).val - (τ.val j₀ i).val + 0 := by ring
-        _ = (τ.val j₀ j).val - (τ.val j₀ i).val +
-            ((τ.val i j).val - (τ.val j₀ j).val + (τ.val j₀ i).val) := by rw [heq]
-        _ = (τ.val i j).val := by ring
+      -- First unfold restrictions in hc, then extract values
+      unfold SkyscraperSection.restrict at hc
+      simp only [hp_j₀ij, ↓reduceDIte] at hc
+      -- hc now: {val := (↑τ i j).val, ...} - {val := (↑τ j₀ j).val, ...} + {val := (↑τ j₀ i).val, ...} = 0
+      -- Extract the value equation using ext and val
+      have heq : (τ.val i j).val - (τ.val j₀ j).val + (τ.val j₀ i).val = 0 := by
+        have := congrArg SkyscraperSection.val hc
+        -- The .val of (a - b + c) is definitionally a.val - b.val + c.val
+        -- but instance diamonds prevent simp from seeing this; use convert
+        convert this using 1
+      -- Goal: (↑τ j₀ j).val - (↑τ j₀ i).val = (↑τ i j).val
+      -- From heq: a - b + c = 0, deduce b - c = a (over ℂ, use linear_combination)
+      linear_combination -heq
 
     · -- p ∉ Uij: both sides are 0
       have h_tau_zero : (τ.val i j).val = 0 := (τ.val i j).prop hpij
@@ -584,7 +585,7 @@ theorem H1_skyscraper_vanish (RS : RiemannSurface) (O : StructureSheaf RS)
     funext i j
     simp only [cechDiff0, skyscraperSheaf]
     apply SkyscraperSection.ext
-    simp only [SkyscraperSection.sub_val]
+    erw [SkyscraperSection.sub_val]
 
     have hpi : p ∉ (cov.opens i).carrier := fun h => hp (cov.subset i h)
     have hpij : p ∉ ((cov.opens i).inter (cov.opens j)).carrier := fun h => hpi h.1
