@@ -2,6 +2,13 @@
 
 ## Status: 3 honest sorrys remaining in GlobalStokes.lean
 
+## Completed Infrastructure
+- **partialEven_mul** — PROVEN in ExteriorDerivative.lean (product rule for ∂/∂xⁱ on Grassmann products)
+- **SuperPartitionOfUnity fix** — DONE. Removed wrong `super_sum_eq_one` from structure (was vacuous: evaluated each ρ_α in its own chart). Now taken as hypothesis `hSuperSum` in GlobalStokes.lean using `composeEvalAt`. Proved by `normalizedPartition_sum_one` in PartitionOfUnity.lean.
+- **SatisfiesChangeOfVar** — FIXED (no longer vacuous)
+- **SatisfiesSuperCocycle** — FIXED (restricted to atlas transitions)
+- **SuperDomainFunction Ring/Algebra** — DISCOVERED: full `Ring` and `Algebra ℝ` instances exist in SuperDomainAlgebra.lean. This means `mul_add`, `add_mul`, `Algebra.smul_mul_assoc`, `Algebra.mul_smul_comm` etc. are all available, greatly simplifying remaining proofs.
+
 ## Overview of What's Needed
 
 Three theorems need proofs:
@@ -9,7 +16,77 @@ Three theorems need proofs:
 2. `globalBerezinIntegral_independent_proper` — PU independence (double-sum trick)
 3. `global_super_stokes_no_boundary` — ∫_M dν = 0
 
-These depend on infrastructure that is partially built.
+---
+
+## Next Step: Leibniz Rule for d₀ on Products
+
+### Mathematical Statement
+
+For a super function ρ and codim-1 form ν = Σᵢ fᵢ d̂xⁱ δ(dθ):
+
+  d₀(ρ · ν) = ρ · d₀ν + Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · fᵢ [Dx Dθ]
+
+### Proof Strategy (simplified by Ring/Algebra instances)
+
+Since `SuperDomainFunction p q` has `Ring` and `Algebra ℝ` instances:
+
+1. **LHS**: `d0Codim1(mulByFunction ρ ν)` coefficient at K is:
+   `Σᵢ (-1)ⁱ • (partialEven i (ρ * νᵢ))_K`
+
+2. **Apply `partialEven_mul`**: Each term becomes:
+   `(-1)ⁱ • ((∂ᵢρ * νᵢ + ρ * ∂ᵢνᵢ)_K)`
+
+3. **Distribute smul over add**: Using `smul_add`:
+   `(-1)ⁱ • (∂ᵢρ * νᵢ)_K + (-1)ⁱ • (ρ * ∂ᵢνᵢ)_K`
+
+4. **Split the sum**: `Finset.sum_add_distrib` gives two sums.
+
+5. **Factor ρ from second sum**: Using `Algebra.smul_mul_assoc` and ring distributivity:
+   `Σᵢ (-1)ⁱ • (ρ * ∂ᵢνᵢ)_K = (ρ * Σᵢ (-1)ⁱ • ∂ᵢνᵢ)_K`
+
+   This requires showing ρ distributes through `Finset.sum` and `smul`.
+   Key lemma needed: `(ρ * Finset.sum s f)_K = Finset.sum s (fun i => (ρ * f i)_K)`.
+   This follows from `mul_sum` (available because SuperDomainFunction is a Ring) applied coefficient-wise.
+
+6. The second sum is then `(mulByFunction ρ (d0Codim1 ν)).coefficient_K`.
+
+### Lean Statement
+
+```lean
+/-- Wedge product of d₀ρ with a codim-1 form: Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · νᵢ [Dx Dθ] -/
+noncomputable def wedgeEvenDeriv {p q : ℕ} (ρ : SuperDomainFunction p q)
+    (ν : IntegralFormCodim1 p q) : IntegralForm p q :=
+  ⟨⟨fun K => Finset.univ.sum fun (i : Fin p) =>
+    ((-1 : ℝ) ^ (i : ℕ)) • ((partialEven i ρ) * ν.components i).coefficients K⟩⟩
+
+theorem d0Codim1_mulByFunction {p q : ℕ} (ρ : SuperDomainFunction p q)
+    (ν : IntegralFormCodim1 p q) :
+    d0Codim1 (IntegralFormCodim1.mulByFunction ρ ν) =
+    IntegralForm.mulByFunction ρ (d0Codim1 ν) + wedgeEvenDeriv ρ ν
+```
+
+### Key Helper Lemma: mul distributes through coefficient-level sum
+
+Need to show that `IntegralForm.mulByFunction ρ (d0Codim1 ν)` at coefficient K equals
+`Σᵢ (-1)ⁱ • (ρ * ∂ᵢνᵢ)_K`. Unfolding:
+
+```
+(ρ * d₀ν.coefficient)_K
+= (ρ * ⟨fun K => Σᵢ (-1)ⁱ • (∂ᵢνᵢ)_K⟩)_K
+```
+
+This requires: `(ρ * f)_K` distributes over the definition of `f_K` as a sum.
+Since multiplication at the SuperDomainFunction level distributes over the
+Grassmann product formula, and the d₀ν coefficient involves a sum over i in
+the SmoothFunction-valued coefficients, we need:
+
+Option A: Work at the `SuperDomainFunction` level using `mul_sum` + `smul_mul_assoc`
+from the Ring/Algebra instance, then unfold to coefficient K.
+
+Option B: Define intermediate lemma `mul_coefficient_sum` showing
+`(f * ⟨fun K => Σ_i g_i_K⟩).coefficients K = Σ_i (f * ⟨fun K => g_i_K⟩).coefficients K`.
+
+Option A is cleaner.
 
 ---
 
@@ -45,17 +122,16 @@ Berezinian denominator), we get `det(A_body) = det(body Jacobian)`.
 Step 4: Apply `hChangeOfVar.change_of_var` with Φ = φ.bodyMap, matching pointwise.
 
 **Infrastructure needed**:
-- Lemma: `berezinIntegralOdd(pullbackProper φ ω) = some function of (berezinIntegralOdd ω) ∘ φ.bodyMap`
-- This requires extracting the top-θ component from the Grassmann product.
-- The Grassmann product formula: `(a * b)_K = Σ_{I ∪ J = K, I ∩ J = ∅} sign(I,J) a_I b_J`
-  is already implemented in `SuperDomainFunction.mul`.
+- Lemma: `berezinIntegralOdd(pullbackProper φ ω)` at body = `(berezinIntegralOdd ω) ∘ φ.bodyMap · det(body Jacobian)`
+- Top-θ component extraction from Grassmann product
+- Berezinian body value = det(Jacobian)
 
 **Available infrastructure**:
 - `pullbackEvalAt` (Pullback.lean): computes the pullback at a body point
 - `berezinianCarrierAt` (Pullback.lean): the Berezinian as Grassmann element
 - `berezinianCarrierAt_grassmannSmooth` (Pullback.lean): smoothness of Ber coefficients
 - `composeEvalAt` (SuperCompose.lean): super function composition at a point
-- `BodyIntegral.SatisfiesChangeOfVar`: the classical CoV hypothesis (now properly formulated)
+- `BodyIntegral.SatisfiesChangeOfVar`: the classical CoV hypothesis (properly formulated)
 
 ---
 
@@ -65,7 +141,7 @@ Step 4: Apply `hChangeOfVar.change_of_var` with Φ = φ.bodyMap, matching pointw
 
 **Proof (double-sum trick, Witten §3.1)**:
 
-Step 1: Insert 1 = Σ_β σ_β (super-level PU sum in chart α's coordinates):
+Step 1: Insert 1 = Σ_β σ_β (via `hSuperSum₂` hypothesis):
   Σ_α ∫_{U_α} ρ_α · f_α = Σ_{α,β} ∫_{U_α} ρ_α · σ_β · f_α
 
 Step 2: On U_α ∩ U_β, use super cocycle (SatisfiesSuperCocycle):
@@ -73,22 +149,17 @@ Step 2: On U_α ∩ U_β, use super cocycle (SatisfiesSuperCocycle):
 
 Step 3: Change of variables (theorem 1 above):
   ∫_{U_α} (ρ_α · σ_β) · f_α = ∫_{U_β} (ρ_α · σ_β) · f_β
-  (The ρ_α · σ_β factor gets composed with the inverse transition)
 
-Step 4: Reorder sum:
+Step 4: Reorder sum and use `hSuperSum₁`:
   = Σ_β ∫_{U_β} (Σ_α ρ_α) · σ_β · f_β
-  = Σ_β ∫_{U_β} 1 · σ_β · f_β          (using Σ_α ρ_α = 1 in chart β)
+  = Σ_β ∫_{U_β} 1 · σ_β · f_β
   = Σ_β ∫_{U_β} σ_β · f_β
 
 **Requirements**:
 - `berezin_change_of_variables` (theorem 1)
-- `SatisfiesSuperCocycle` on the GlobalIntegralForm
-- `super_sum_eq_one` in a SINGLE chart (the Witten-normalized version)
-- Linearity of bodyIntegral
-
-**CRITICAL**: The `super_sum_eq_one` must hold in a single coordinate system.
-The current formulation evaluates each ρ_α in its own chart — this is WRONG
-for the double-sum trick. See section on PU fix below.
+- `SatisfiesSuperCocycle` on the GlobalIntegralForm ✓
+- `hSuperSum₁`, `hSuperSum₂` hypotheses ✓ (added to theorem signature)
+- Linearity of bodyIntegral ✓
 
 ---
 
@@ -100,13 +171,8 @@ for the double-sum trick. See section on PU fix below.
 
 Step 1: Expand: ∫_M dν = Σ_α ∫_{U_α} ρ_α · (dν)_α
 
-Step 2: Leibniz rule for d₀ on products:
+Step 2: Leibniz rule for d₀ on products (using `d0Codim1_mulByFunction`):
   ρ_α · d₀(ν_α) = d₀(ρ_α · ν_α) - Σᵢ (-1)ⁱ (∂ρ_α/∂xⁱ) · (ν_α)_i
-
-  where ν_α = Σᵢ fᵢ d̂xⁱ δ(dθ), so (ν_α)_i is the i-th component.
-
-  This is the product rule: d₀(fg) = f·d₀g + d₀f · g, adapted to the
-  codimension-1 form structure.
 
 Step 3: Each ∫ d₀(ρ_α · ν_α) = 0:
   - ρ_α · ν_α has compact support in U_α (ρ_α vanishes on ∂U_α)
@@ -116,146 +182,30 @@ Step 3: Each ∫ d₀(ρ_α · ν_α) = 0:
 Step 4: Correction terms cancel:
   Σ_α Σᵢ (-1)ⁱ ∫ (∂ρ_α/∂xⁱ) · (ν_α)_i
   = Σᵢ (-1)ⁱ ∫ (∂(Σ_α ρ_α)/∂xⁱ) · fᵢ     (by linearity of ∂/∂xⁱ)
-  = Σᵢ (-1)ⁱ ∫ (∂1/∂xⁱ) · fᵢ                (by Σ_α ρ_α = 1)
+  = Σᵢ (-1)ⁱ ∫ (∂1/∂xⁱ) · fᵢ                (by hSuperSum: Σ_α ρ_α = 1)
   = 0                                          (derivative of constant = 0)
 
 Step 5: Combining: ∫_M dν = Σ_α [0 - correction_α] = 0 - 0 = 0.
 
 **Infrastructure needed**:
-(a) **Leibniz rule for d₀**: d₀(ρ · ν) = ρ · d₀ν + Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · fᵢ
-    - This is a computation using `partialEven` and the product rule for fderiv
-    - Should go in ExteriorDerivative.lean
-    - The key identity: ∂(ρ·fᵢ)/∂xⁱ = ρ · ∂fᵢ/∂xⁱ + (∂ρ/∂xⁱ) · fᵢ
-    - This follows from fderiv_mul (Mathlib)
-
-(b) **Compact support of ρ_α · ν_α**: from `support_subset` of the PU
-
+(a) **d0Codim1_mulByFunction** (Leibniz rule) — IN PROGRESS
+(b) **Compact support of ρ_α · ν_α** — from `support_subset` of the PU
 (c) **Partition derivative identity**: ∂(Σ_α ρ_α)/∂xⁱ = 0
-    - Follows from Σ_α ρ_α = 1 (constant) and linearity of ∂/∂xⁱ
-    - Needs super_sum_eq_one in a single chart (same issue as theorem 2)
-
-(d) **Connection between ρ_α · ν_α and IntegralFormCodim1 structure**:
-    - Need to show ρ_α · ν_α is a valid codim-1 form with compact support
-    - Its components are ρ_α · fᵢ (super function times super function)
+    - Follows from `hSuperSum` (Σ ρ_α = 1) + `partialEven` of constant = 0
+(d) **Connection**: d₀(ρ_α · ν_α) is divergence of compactly supported vector field
 
 ---
 
-## SuperPartitionOfUnity Fix Needed
+## Key Discovery: SuperDomainFunction Algebra Structure
 
-### Problem
+`SuperDomainFunction p q` has full `Ring` and `Algebra ℝ` instances
+(SuperDomainAlgebra.lean:658 and :759). This provides:
+- `mul_add`, `add_mul` (distributivity)
+- `mul_assoc` (associativity)
+- `Algebra.smul_mul_assoc`, `Algebra.mul_smul_comm` (scalar-mult compatibility)
+- `mul_sum`, `Finset.sum_mul` (distribution over sums, from Semiring)
 
-The current `super_sum_eq_one` evaluates each `functions α` at chart α's own
-coordinates. Since each function is `liftToSuper(ρ̃_α)` (θ-independent in its
-own chart), the I≠∅ coefficients are trivially 0.
-
-But for the double-sum trick and global Stokes, we need:
-  **Σ_α (ρ_α expressed in chart β) = 1** as super functions in chart β.
-
-When you express `liftToSuper(ρ̃_α)` in chart β via the transition T_{αβ},
-you get θ-dependence from Taylor expansion. The raw sum in chart β is 1 + nilpotent,
-NOT 1.
-
-### Fix
-
-The `SuperPartitionOfUnity` should store the **Witten-normalized** partition
-functions, where each `functions α` is the normalized function expressed in
-chart α's coordinates:
-
-  ρ_α = (liftToSuper ρ̃_α) · S_α⁻¹
-
-where S_α is the raw sum expressed in chart α. Then `super_sum_eq_one` should
-require the sum after pulling back to any common chart β:
-
-  Σ_α composeEvalAt(ρ_α, T_{αβ}, x) = 1
-
-The existing `normalizedPartition_sum_one` already proves this for the
-`normalizedPartitionAt` functions!
-
-### Alternative (simpler)
-
-Keep the PU structure as-is, but add a field for the composed/normalized sum:
-
-```lean
-super_sum_eq_one_in_chart : ∀ (β : SuperChart M)
-    (transitions : index → SuperCoordChange dim.even dim.odd)
-    (x : Fin dim.even → ℝ),
-    Σ_α composeEvalAt(functions α, transitions α, x) = 1
-```
-
-This directly states what the double-sum trick needs.
-
-### Infrastructure already available
-
-- `rawSumAt`, `rawSumInverseAt` (PartitionOfUnity.lean)
-- `normalizedPartitionAt` (PartitionOfUnity.lean)
-- `normalizedPartition_sum_one` (PartitionOfUnity.lean): Σ_α norm_α = 1
-- `rawSumAt_body_eq_one`: body of raw sum = 1
-- `rawSumAt_mul_inverse`: S · S⁻¹ = 1
-- `composeEvalAt` (SuperCompose.lean)
-- `grassmannGeomInverse` (NilpotentInverse.lean)
-
----
-
-## Leibniz Rule for d₀ — Detailed Strategy
-
-### Mathematical Statement
-
-For a super function ρ (even, in SuperDomainFunction p q) and a codim-1 form
-ν = Σᵢ fᵢ d̂xⁱ δ(dθ):
-
-  d₀(ρ · ν) = ρ · d₀ν + Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · fᵢ [Dx Dθ]
-
-where ρ · ν is the codim-1 form with components (ρ · fᵢ).
-
-### Proof
-
-The i-th component of ρ · ν is `SuperDomainFunction.mul ρ (ν.components i)`.
-
-d₀(ρ · ν) = Σᵢ (-1)ⁱ ∂(ρ · fᵢ)/∂xⁱ [Dx Dθ]
-
-By the product rule for partialEven (needs to be proved):
-  partialEven i (SuperDomainFunction.mul ρ f) =
-  SuperDomainFunction.add
-    (SuperDomainFunction.mul ρ (partialEven i f))
-    (SuperDomainFunction.mul (partialEven i ρ) f)
-
-This follows from the Leibniz rule for fderiv (fderiv_mul in Mathlib) applied
-coefficient-by-coefficient.
-
-Then:
-  d₀(ρ · ν) = Σᵢ (-1)ⁱ [ρ · ∂fᵢ/∂xⁱ + (∂ρ/∂xⁱ) · fᵢ]
-             = ρ · [Σᵢ (-1)ⁱ ∂fᵢ/∂xⁱ] + Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · fᵢ
-             = ρ · d₀ν + correction
-
-### Key helper lemma needed
-
-```lean
-theorem partialEven_mul {p q : ℕ} (i : Fin p) (f g : SuperDomainFunction p q) :
-    partialEven i (SuperDomainFunction.mul f g) =
-    SuperDomainFunction.add
-      (SuperDomainFunction.mul (partialEven i f) g)
-      (SuperDomainFunction.mul f (partialEven i g))
-```
-
-This is the main technical challenge. The proof requires:
-1. Unfold `SuperDomainFunction.mul` to the Grassmann product formula
-2. Apply fderiv to each term: fderiv(Σ sign · f_I · g_J) = Σ sign · (f_I' · g_J + f_I · g_J')
-3. Regroup into two sums matching the RHS
-
-The difficulty is that `SuperDomainFunction.mul` involves a sum over all
-decompositions I ∪ J = K with signs (reorderSign). The product rule must be
-applied to each term, and the result regrouped.
-
-### Alternative approach for partialEven_mul
-
-Instead of working through the full Grassmann product, observe that
-at each body point x, `partialEven i` acts as `fderiv ℝ (·) x (eᵢ)` on
-each coefficient. So we need:
-
-  fderiv(f * g)_K(x)(eᵢ) = Σ_{I∪J=K} sign · [f_I'(x)(eᵢ) · g_J(x) + f_I(x) · g_J'(x)(eᵢ)]
-
-This is just the product rule applied inside the sum, which is straightforward
-if f_I and g_J are both differentiable (they are, being smooth functions).
+These bypass the need for coefficient-level gymnastics in many proofs.
 
 ---
 
@@ -264,26 +214,12 @@ if f_I and g_J are both differentiable (they are, being smooth functions).
 The Integration/ files use the following from the Berezinian infrastructure:
 
 1. **BerezinianMul.lean** (`ber_mul`): Used in `berezinian_cocycle_full`
-   (BerezinIntegration.lean) via `berezinian_cocycle_from_chain_rule`.
-   This proves Ber(J₁ · J₂) = Ber(J₁) · Ber(J₂).
-
+   via `berezinian_cocycle_from_chain_rule`.
 2. **Berezinian.lean** (`SuperMatrix.ber`, `berezinianAt`): Used in Pullback.lean
-   for `pullbackEvalAt` — the pullback multiplies by the Berezinian.
-
-3. **SuperChainRule.lean** (`berezinian_cocycle_from_chain_rule`): Used in
-   `berezinian_cocycle_full` in BerezinIntegration.lean.
-
-4. **NilpotentInverse.lean** (geometric series, `grassmannGeomInverse`): Used in
-   PartitionOfUnity.lean for `rawSumInverseAt` (inverting 1 + nilpotent).
-   Also `ringInverse_eq_grassmannInv` bridges Ring.inverse to geometric series.
-
-5. **GrassmannSmooth.lean** (`grassmannSmooth` predicate): Used in Pullback.lean
-   for `berezinianCarrierAt_grassmannSmooth` (Ber coefficients are smooth in x).
-
-For the remaining proofs:
-- `berezin_change_of_variables` WILL use `berezinianCarrierAt` from Pullback.lean
-- The body-level reduction lemma needs `Ber_body = det(A_body)/det(D_body)`,
-  which connects to the Berezinian definition in Berezinian.lean.
+   for `pullbackEvalAt`.
+3. **SuperChainRule.lean** (`berezinian_cocycle_from_chain_rule`): Berezinian cocycle.
+4. **NilpotentInverse.lean** (geometric series, `grassmannGeomInverse`): PU normalization.
+5. **GrassmannSmooth.lean** (`grassmannSmooth` predicate): Pullback smoothness.
 
 ---
 

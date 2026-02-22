@@ -24,30 +24,34 @@
 | Integration/Pullback.lean | `pullbackEvalAt`, `pullbackProper`, `berezinianCarrierAt_grassmannSmooth` |
 | Integration/PartitionOfUnity.lean | `normalizedPartition_sum_one` (algebraic core) |
 | Integration/IntegralFormCodim.lean | Codimension-1 integral forms |
-| Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence` |
+| Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence`, **`partialEven_mul`** (product rule) |
 | Integration/StokesTheorem.lean | Local Stokes: super → classical divergence |
+
+### Recently Completed
+- **`partialEven_mul`** (ExteriorDerivative.lean): Product rule ∂(fg)/∂xⁱ = (∂f/∂xⁱ)g + f(∂g/∂xⁱ) for Grassmann products. Uses `partialEvenSmooth` helper + Leibniz for SmoothFunction products + distribution through sums/ite/smul.
+- **SuperPartitionOfUnity fix**: Removed wrong `super_sum_eq_one` from structure (evaluated in own chart = vacuous). Now `hSuperSum` hypothesis in GlobalStokes.lean using `composeEvalAt`.
 
 ### Honest Sorrys (correct signatures, proofs pending)
 
 | Location | Sorry | What's Needed |
 |----------|-------|---------------|
 | GlobalStokes.lean | `berezin_change_of_variables` | Body-level reduction lemma |
-| GlobalStokes.lean | `globalBerezinIntegral_independent_proper` | Double-sum trick + PU fix |
+| GlobalStokes.lean | `globalBerezinIntegral_independent_proper` | Double-sum trick |
 | GlobalStokes.lean | `global_super_stokes_no_boundary` | Leibniz rule + partition derivative cancellation |
 | BerezinIntegration.lean | `partition_of_unity_exists` | Connect Mathlib paracompactness |
 | BerezinIntegration.lean | `globalBerezinIntegral_independent` | Same as `_proper` version |
 | BerezinIntegration.lean | `berezin_change_of_variables_formula` | Legacy, superseded by GlobalStokes |
 | BerezinIntegration.lean | `IntegralForm.pullback` | Superseded by `pullbackProper` |
 
-### Definition Fix Needed
-
-**`SuperPartitionOfUnity.super_sum_eq_one`** — current formulation evaluates each ρ_α in its own chart. For the double-sum trick, we need `Σ_α (ρ_α composed to chart β) = 1` in a single chart. Must reformulate to use `composeEvalAt`. See GlobalStokes.md for details.
-
 ---
 
 ## Proof Dependencies
 
 ```
+d0Codim1_mulByFunction (Leibniz rule for d₀)     ← IN PROGRESS
+  ← partialEven_mul ✓
+  ← SuperDomainFunction Ring/Algebra instances ✓ (mul_add, mul_sum, smul_mul_assoc)
+
 berezin_change_of_variables
   ← body-level reduction lemma (NEW)
   ← pullbackEvalAt, berezinianCarrierAt (Pullback.lean) ✓
@@ -56,86 +60,49 @@ berezin_change_of_variables
 globalBerezinIntegral_independent_proper
   ← berezin_change_of_variables
   ← SatisfiesSuperCocycle (fixed) ✓
-  ← super_sum_eq_one IN A SINGLE CHART (needs PU definition fix)
+  ← hSuperSum hypotheses ✓ (added to theorem signature)
   ← BodyIntegral.IsLinear ✓
 
 global_super_stokes_no_boundary
-  ← Leibniz rule: d₀(ρ·ν) = ρ·d₀ν + correction (NEW)
-  ← partialEven_mul: product rule for ∂/∂xⁱ on products (NEW)
+  ← d0Codim1_mulByFunction (Leibniz) ← IN PROGRESS
   ← d0_is_divergence ✓
   ← hDivThm (hypothesis: classical divergence theorem)
   ← partition derivative cancellation: ∂(Σρ_α)/∂xⁱ = 0
-    ← super_sum_eq_one in single chart (needs PU fix)
+    ← hSuperSum ✓
 ```
 
 ---
 
 ## Execution Order
 
-### Step 1: Fix SuperPartitionOfUnity definition
+### Step 1: Fix SuperPartitionOfUnity definition ✓ DONE
+Removed `super_sum_eq_one` from structure. Now `hSuperSum` hypothesis in GlobalStokes.lean.
 
-Reformulate `super_sum_eq_one` to require sum-to-one after composing all functions to a common chart:
+### Step 2: Prove `partialEven_mul` (product rule) ✓ DONE
+~120 lines of infrastructure in ExteriorDerivative.lean. Uses `partialEvenSmooth` at SmoothFunction level.
 
-```lean
-super_sum_eq_one_in_chart : ∀ (β : SuperChart M)
-    (transitions : index → SuperCoordChange dim.even dim.odd)
-    (x : Fin dim.even → ℝ)
-    (hbody : grassmannBody (rawSumAt ...) = 1),
-    Σ_α composeEvalAt (functions α) (transitions α) x = 1
-```
-
-This is exactly what `normalizedPartition_sum_one` proves. The Witten construction:
-1. Lift ρ̃_α to chart α (θ-independent there)
-2. Compose to common chart β via transitions → picks up θ-dependence
-3. Raw sum S = 1 + nilpotent (body sum = 1, soul nilpotent)
-4. S is invertible: S⁻¹ = geometric series
-5. Normalize: ρ_α := (lift ρ̃_α ∘ T) · S⁻¹
-6. Sum: Σ ρ_α = S · S⁻¹ = 1
-
-All algebraic infrastructure for this is already proven.
-
-### Step 2: Prove `partialEven_mul` (product rule)
+### Step 3: Prove Leibniz rule for d₀ ← CURRENT
+Using `partialEven_mul` + Ring/Algebra instances on SuperDomainFunction:
 
 ```lean
-theorem partialEven_mul (i : Fin p) (f g : SuperDomainFunction p q) :
-    partialEven i (SuperDomainFunction.mul f g) =
-    SuperDomainFunction.add
-      (SuperDomainFunction.mul (partialEven i f) g)
-      (SuperDomainFunction.mul f (partialEven i g))
+theorem d0Codim1_mulByFunction (ρ : SuperDomainFunction p q) (ν : IntegralFormCodim1 p q) :
+    d0Codim1 (IntegralFormCodim1.mulByFunction ρ ν) =
+    IntegralForm.mulByFunction ρ (d0Codim1 ν) + wedgeEvenDeriv ρ ν
 ```
 
-Strategy: At each coefficient I and point x, this reduces to showing that
-fderiv of the Grassmann product formula respects the Leibniz rule. Use
-`fderiv_mul` from Mathlib applied to each term in the sum.
-
-### Step 3: Prove Leibniz rule for d₀
-
-Using `partialEven_mul`, show:
-
-```lean
-theorem d0_leibniz (ρ : SuperDomainFunction p q) (ν : IntegralFormCodim1 p q) :
-    d0Codim1 (mulByCodim1 ρ ν) =
-    IntegralForm.mulByFunction ρ (d0Codim1 ν) +
-    correction_term ρ ν
-```
-
-where `correction_term ρ ν` is Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · fᵢ.
+Key insight: SuperDomainFunction has `Ring` + `Algebra ℝ` instances (SuperDomainAlgebra.lean), so `mul_sum`, `smul_mul_assoc` etc. are available. This simplifies factoring ρ out of sums.
 
 ### Step 4: Prove body-level reduction lemma
-
 Show that `berezinIntegralOdd(pullbackProper φ ω)` at body level equals
 `(berezinIntegralOdd ω) ∘ φ.bodyMap · det(body Jacobian)`.
 
 ### Step 5: Prove `berezin_change_of_variables`
-
 Combine body-level reduction with `hChangeOfVar.change_of_var`.
 
 ### Step 6: Prove `globalBerezinIntegral_independent_proper`
-
 Double-sum trick using Steps 1 and 5.
 
 ### Step 7: Prove `global_super_stokes_no_boundary`
-
 Leibniz (Step 3) + local Stokes + partition derivative cancellation (Step 1).
 
 ---
@@ -161,11 +128,11 @@ Leibniz (Step 3) + local Stokes + partition derivative cancellation (Step 1).
 
 | Definition | Status |
 |------------|--------|
-| `BodyIntegral.SatisfiesChangeOfVar` | Fixed: requires Φ, hBij, signed det (not \|det\|) |
+| `BodyIntegral.SatisfiesChangeOfVar` | Fixed: requires Φ, hBij, signed det |
 | `globalBerezinIntegral` | Fixed: bodyIntegral takes Set argument |
-| `SuperPartitionOfUnity.super_sum_eq_one` | **NEEDS FIX**: must be in single chart |
+| `SuperPartitionOfUnity` | Fixed: `super_sum_eq_one` removed, now hypothesis `hSuperSum` |
 | `GlobalIntegralForm.SatisfiesSuperCocycle` | Fixed: restricted to SuperTransition |
-| `GlobalIntegralForm.compatible_body` | Fixed: signed det (not \|det\|) |
+| `GlobalIntegralForm.compatible_body` | Fixed: signed det |
 
 ---
 

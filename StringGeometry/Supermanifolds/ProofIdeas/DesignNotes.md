@@ -163,11 +163,13 @@ The algebraic core is fully proven:
 - `normalizedPartitionAt` computes ρ_α = (lift ∘ T) · S⁻¹
 - `normalizedPartition_sum_one` proves Σ ρ_α = 1
 
-### Design issue with SuperPartitionOfUnity
+### Design fix for SuperPartitionOfUnity — DONE
 
-The `super_sum_eq_one` field currently evaluates each function in its own chart.
-This is too weak for the double-sum trick, which needs all functions expressed
-in a SINGLE chart. Must reformulate to use `composeEvalAt`.
+The `super_sum_eq_one` field was removed from the `SuperPartitionOfUnity` structure
+(it evaluated each function in its own chart — vacuously true). Now the super-level
+sum condition is taken as an explicit hypothesis `hSuperSum` in GlobalStokes.lean
+theorems, using `composeEvalAt` to express all PU functions in a single chart.
+This is proved by `normalizedPartition_sum_one` in PartitionOfUnity.lean.
 
 ## Integral Forms vs Densities
 
@@ -191,15 +193,29 @@ Net result at body level: only det(A_body) = det(body Jacobian) remains.
 
 This is why `compatible_body` has `(det bodyJac)⁻¹` and not the full Berezinian.
 
-## Product Rule for partialEven
+## Product Rule for partialEven — PROVEN
 
 The Leibniz rule for `partialEven i` on products of super functions:
 
   ∂(f·g)/∂xⁱ = (∂f/∂xⁱ)·g + f·(∂g/∂xⁱ)
 
-is NOT trivial to prove in Lean because `SuperDomainFunction.mul` involves
-the Grassmann product formula with reorder signs. The proof must:
-1. Apply fderiv_mul to each coefficient term in the Grassmann product
-2. Regroup the resulting sum into two copies of the Grassmann product
+is proven as `partialEven_mul` in ExteriorDerivative.lean (~120 lines).
 
-This is the key technical lemma needed for the Leibniz rule for d₀.
+**Proof approach**: Instead of working through the full Grassmann product formula
+directly, the proof introduces `partialEvenSmooth` at the `SmoothFunction` level
+with helper lemmas (distributes over sum, ite, smul; satisfies Leibniz for
+SmoothFunction products via `fderiv_mul`). Then a single `simp_rw` chain
+transforms the LHS into the RHS by distributing through the Grassmann sum structure.
+
+## SuperDomainFunction Has Full Ring/Algebra Structure
+
+**Key discovery**: `SuperDomainFunction p q` has `Ring` and `Algebra ℝ` instances
+(SuperDomainAlgebra.lean:658, :759). This provides:
+- `mul_add`, `add_mul` — distributivity
+- `mul_assoc` — associativity
+- `mul_sum`, `Finset.sum_mul` — distribution over sums (from Semiring)
+- `Algebra.smul_mul_assoc`, `Algebra.mul_smul_comm` — scalar compatibility
+- `one_mul`, `mul_one` — identity
+
+This dramatically simplifies proofs that need to factor/distribute multiplication
+through sums, which arise in the Leibniz rule for d₀ and global integration.

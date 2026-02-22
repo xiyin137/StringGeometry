@@ -117,12 +117,25 @@ d₁(f [Dx Dθ]) = Σ_a (∂f/∂θ^a) · (complicated codim-1 form)
 
 This direction is less critical for basic Stokes.
 
-## Key Properties to Prove
+## Key Properties — Status
 
-1. **d² = 0**: d₀² = 0, d₁² = 0, d₀d₁ + d₁d₀ = 0
-2. **d₀ commutes with Berezin integral**: (d₀ν)_top = d₀(ν_top)
-3. **d₁ killed by Berezin integral**: ∫dθ (d₁ν) = 0
-4. **Leibniz rule**: d(fν) = df ∧ ν + (-1)^{|f|} f dν
+### Proven
+- **d₀ is additive**: `d0Codim1_add` in ExteriorDerivative.lean
+- **d₀ = divergence**: `d0_is_divergence` in ExteriorDerivative.lean
+- **partialEven_mul**: Product rule ∂(fg)/∂xⁱ = (∂f/∂xⁱ)g + f(∂g/∂xⁱ)
+- **partialEven_add**, **partialEven_smul**: Linearity of ∂/∂xⁱ
+- **partialOdd linearity**: `partialOdd_add`
+- **∂²/∂θᵃ² = 0**: `partialOdd_partialOdd`
+- **Local Stokes**: Super Stokes → classical divergence theorem (StokesTheorem.lean)
+
+### In Progress
+- **Leibniz rule for d₀ on products**: `d0Codim1_mulByFunction`
+  d₀(ρ · ν) = ρ · d₀ν + Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · νᵢ
+  Uses `partialEven_mul` + Ring/Algebra distributivity on SuperDomainFunction
+
+### Not Yet Needed
+- **d² = 0**: d₀² = 0 follows from symmetry of mixed partials. Not needed for Stokes.
+- **d₁ on integral forms**: d₁ maps to different graded piece. Already explained in docstring.
 
 ## References
 

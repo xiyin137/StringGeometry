@@ -69,25 +69,26 @@ This is proved in `normalizedPartition_sum_one`.
 | `normalizedPartition_sum_one` | Σ_α ρ_α = 1 |
 | `superPartitionFromBody` | Constructs SuperPartitionOfUnity from body data |
 
-### What needs fixing
+### Fix Applied — DONE
 
-**`SuperPartitionOfUnity.super_sum_eq_one`**: Currently evaluates each function in
-its own chart, which trivially gives I≠∅ components = 0. But for the
-double-sum trick and global Stokes, we need the sum in a SINGLE chart to be 1.
+**Problem**: `SuperPartitionOfUnity.super_sum_eq_one` evaluated each function in
+its own chart, which trivially gives I≠∅ components = 0. Useless for the
+double-sum trick (needs sum in a SINGLE chart to be 1).
 
-**Fix**: The `functions α` field should store the Witten-normalized functions,
-and `super_sum_eq_one` should be reformulated as:
+**Solution**: Removed `super_sum_eq_one` from the `SuperPartitionOfUnity` structure
+entirely. The super-level sum condition is now an explicit hypothesis `hSuperSum`
+in the GlobalStokes.lean theorems that need it:
 
 ```lean
-super_sum_eq_one_in_chart : ∀ (β : SuperChart M)
-    (transitions : index → SuperCoordChange dim.even dim.odd)
-    (x : Fin dim.even → ℝ)
-    (hbody : ...),
-    Σ_α composeEvalAt (functions α) (transitions α) x = 1
+(transitions : pu.index → SuperCoordChange dim.even dim.odd)
+(hSuperSum : ∀ x : Fin dim.even → ℝ,
+    @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
+      (@Finset.univ pu.index pu.finIndex) (fun α =>
+        composeEvalAt (pu.functions α) (transitions α) x) = 1)
 ```
 
-Alternatively, store the normalized functions directly (in a reference chart β),
-then `super_sum_eq_one` is just `normalizedPartition_sum_one`.
+This is satisfied by the Witten-normalized partition, proved in
+`normalizedPartition_sum_one` (PartitionOfUnity.lean).
 
 ### What's sorry'd
 
