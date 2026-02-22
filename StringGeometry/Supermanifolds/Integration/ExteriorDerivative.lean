@@ -97,6 +97,125 @@ theorem partialEven_smul {p q : ℕ} (i : Fin p) (c : ℝ) (f : SuperDomainFunct
     c * (fderiv ℝ (f.coefficients I).toFun x (Pi.single i 1))
   simp only [fderiv_const_mul hf, ContinuousLinearMap.smul_apply, smul_eq_mul]
 
+/-! ### Product Rule for partialEven (Leibniz Rule)
+
+The product rule ∂(fg)/∂xⁱ = (∂f/∂xⁱ)g + f(∂g/∂xⁱ) for super domain functions.
+
+The proof works by:
+1. Expressing the Grassmann product coefficient (fg)_K as a sum of f_I · g_J products
+2. Distributing the partial derivative through the sum (linearity)
+3. Applying the Leibniz rule for smooth functions to each f_I · g_J term
+4. Reassembling into the Grassmann products (∂f·g)_K and (f·∂g)_K
+-/
+
+/-- Partial derivative of a smooth function in the i-th coordinate direction.
+    This is the SmoothFunction-level operation that partialEven applies to each coefficient. -/
+noncomputable def partialEvenSmooth {p : ℕ} (i : Fin p) (f : SmoothFunction p) : SmoothFunction p :=
+  ⟨fun x => fderiv ℝ f.toFun x (Pi.single i 1),
+   f.smooth.fderiv_right (le_of_eq (WithTop.top_add (1 : WithTop ℕ∞)))
+     |>.clm_apply contDiff_const⟩
+
+private lemma partialEvenSmooth_zero {p : ℕ} (i : Fin p) :
+    partialEvenSmooth i (0 : SmoothFunction p) = 0 := by
+  ext x
+  show fderiv ℝ (0 : SmoothFunction p).toFun x (Pi.single i 1) = 0
+  have h0 : fderiv ℝ (fun (_ : Fin p → ℝ) => (0 : ℝ)) x = 0 :=
+    (hasFDerivAt_const (0 : ℝ) x).fderiv
+  rw [show (0 : SmoothFunction p).toFun = (fun _ => (0 : ℝ)) from rfl, h0]
+  simp
+
+private lemma partialEvenSmooth_add {p : ℕ} (i : Fin p) (a b : SmoothFunction p) :
+    partialEvenSmooth i (a + b) = partialEvenSmooth i a + partialEvenSmooth i b := by
+  ext x
+  have ha := a.differentiable'.differentiableAt (x := x)
+  have hb := b.differentiable'.differentiableAt (x := x)
+  show fderiv ℝ (a + b).toFun x (Pi.single i 1) =
+    fderiv ℝ a.toFun x (Pi.single i 1) + fderiv ℝ b.toFun x (Pi.single i 1)
+  rw [show (a + b).toFun = a.toFun + b.toFun from rfl, fderiv_add ha hb,
+    ContinuousLinearMap.add_apply]
+
+/-- partialEvenSmooth distributes over Finset.sum (via AddMonoidHom). -/
+private lemma partialEvenSmooth_sum {p : ℕ} {ι : Type*} (i : Fin p) (s : Finset ι)
+    (h : ι → SmoothFunction p) :
+    partialEvenSmooth i (s.sum h) = s.sum (fun k => partialEvenSmooth i (h k)) := by
+  induction s using Finset.cons_induction with
+  | empty => simp [partialEvenSmooth_zero]
+  | cons a s has ih =>
+    rw [Finset.sum_cons, Finset.sum_cons, partialEvenSmooth_add, ih]
+
+/-- partialEvenSmooth commutes with ite (when else branch is 0). -/
+private lemma partialEvenSmooth_ite {p : ℕ} (i : Fin p) {P : Prop} [Decidable P]
+    (a : SmoothFunction p) :
+    partialEvenSmooth i (if P then a else 0) = if P then partialEvenSmooth i a else 0 := by
+  split
+  · rfl
+  · exact partialEvenSmooth_zero i
+
+/-- partialEvenSmooth is compatible with scalar multiplication. -/
+private lemma partialEvenSmooth_smul {p : ℕ} (i : Fin p) (c : ℝ) (a : SmoothFunction p) :
+    partialEvenSmooth i (c • a) = c • partialEvenSmooth i a := by
+  ext x
+  have ha := a.differentiable'.differentiableAt (x := x)
+  show fderiv ℝ (c • a).toFun x (Pi.single i 1) = c * fderiv ℝ a.toFun x (Pi.single i 1)
+  rw [show (c • a).toFun = (fun y => c * a.toFun y) from rfl]
+  simp only [fderiv_const_mul ha, ContinuousLinearMap.smul_apply, smul_eq_mul]
+
+/-- Leibniz rule for partialEvenSmooth on products of smooth functions. -/
+private lemma partialEvenSmooth_leibniz {p : ℕ} (i : Fin p) (a b : SmoothFunction p) :
+    partialEvenSmooth i (a * b) = partialEvenSmooth i a * b + a * partialEvenSmooth i b := by
+  ext x
+  have ha := a.differentiable'.differentiableAt (x := x)
+  have hb := b.differentiable'.differentiableAt (x := x)
+  show fderiv ℝ (a * b).toFun x (Pi.single i 1) =
+    fderiv ℝ a.toFun x (Pi.single i 1) * b.toFun x +
+    a.toFun x * fderiv ℝ b.toFun x (Pi.single i 1)
+  rw [show (a * b).toFun = a.toFun * b.toFun from rfl, fderiv_mul ha hb]
+  simp only [ContinuousLinearMap.add_apply, ContinuousLinearMap.smul_apply, smul_eq_mul]
+  ring
+
+/-- Helper: splitting ite of a sum into sum of ites. -/
+private lemma ite_add_zero_smooth {p : ℕ} {P : Prop} [Decidable P] (a b : SmoothFunction p) :
+    (if P then (a + b) else (0 : SmoothFunction p)) =
+    (if P then a else 0) + (if P then b else 0) := by
+  split <;> simp
+
+/-- Product rule for partialEven: ∂(fg)/∂xⁱ = (∂f/∂xⁱ)g + f(∂g/∂xⁱ).
+
+    This is the Leibniz rule for the even partial derivative on super domain functions.
+    It holds because partialEven acts by differentiating each coefficient function
+    f_I : ℝ^p → ℝ (using Fréchet derivative), and the Grassmann product formula
+    (fg)_K = Σ sign(I,J) · f_I · g_J is bilinear in the coefficient functions. -/
+theorem partialEven_mul {p q : ℕ} (i : Fin p) (f g : SuperDomainFunction p q) :
+    partialEven i (f * g) = partialEven i f * g + f * partialEven i g := by
+  apply SuperDomainFunction.ext; intro K
+  -- LHS: (partialEven i (f * g)).coefficients K
+  --    = partialEvenSmooth i ((f * g).coefficients K)     [definitional]
+  --    = partialEvenSmooth i (Σ_{I,J} ite cond (sign • (f_I * g_J)) 0)
+  -- RHS: (∂f*g + f*∂g).coefficients K
+  --    = Σ_{I,J} ite cond (sign • (∂f_I * g_J)) 0 + Σ_{I,J} ite cond (sign • (f_I * ∂g_J)) 0
+  --
+  -- Transform LHS by distributing partialEvenSmooth through sum, ite, smul, and
+  -- applying Leibniz on each product term, then splitting into two sums.
+  show partialEvenSmooth i
+    (Finset.univ.sum fun I => Finset.univ.sum fun J =>
+      if I ∪ J = K ∧ I ∩ J = ∅ then
+        (SuperDomainFunction.reorderSign I J : ℝ) • (f.coefficients I * g.coefficients J)
+      else 0) =
+    (Finset.univ.sum fun I => Finset.univ.sum fun J =>
+      if I ∪ J = K ∧ I ∩ J = ∅ then
+        (SuperDomainFunction.reorderSign I J : ℝ) •
+          (partialEvenSmooth i (f.coefficients I) * g.coefficients J)
+      else 0) +
+    (Finset.univ.sum fun I => Finset.univ.sum fun J =>
+      if I ∪ J = K ∧ I ∩ J = ∅ then
+        (SuperDomainFunction.reorderSign I J : ℝ) •
+          (f.coefficients I * partialEvenSmooth i (g.coefficients J))
+      else 0)
+  -- Distribute partialEvenSmooth through sums, ite, scalar mult, then apply Leibniz
+  rw [partialEvenSmooth_sum]
+  simp_rw [partialEvenSmooth_sum, partialEvenSmooth_ite, partialEvenSmooth_smul,
+    partialEvenSmooth_leibniz, smul_add, ite_add_zero_smooth, Finset.sum_add_distrib]
+
 /-- partialOdd is additive: ∂(f+g)/∂θᵃ = ∂f/∂θᵃ + ∂g/∂θᵃ.
     Follows from linearity of the sign-scaled coefficient extraction. -/
 theorem partialOdd_add {p q : ℕ} (a : Fin q) (f g : SuperDomainFunction p q) :

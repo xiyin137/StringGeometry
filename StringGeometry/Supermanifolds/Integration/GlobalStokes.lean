@@ -59,6 +59,47 @@ namespace Supermanifolds
 
 open Supermanifolds.Helpers FiniteGrassmannCarrier
 
+/-! ## Full Super Cocycle Condition
+
+The full super cocycle for a `GlobalIntegralForm` states:
+
+  (f_β ∘ T_{αβ})(x) · Ber(J_{αβ})(x) = f_α(x)
+
+as Grassmann algebra elements, where ∘ denotes super function composition
+(`composeEvalAt`) and Ber is the Berezinian (`berezinianCarrierAt`).
+
+This is stronger than the body-level `compatible_body` condition in
+`GlobalIntegralForm`, which only constrains the top θ-component at θ=0.
+We state it here because `pullbackEvalAt` requires imports from
+Pullback.lean and SuperCompose.lean. -/
+
+/-- The full super cocycle condition for a global integral form.
+
+    At each body point x, the pullback of f_β through the transition T_{αβ}
+    equals f_α as a Grassmann algebra element:
+      pullbackEvalAt(T, f_β, x) = f_α(x)
+
+    The transition φ is obtained from a `SuperTransition` via `toSuperCoordChange`,
+    ensuring it is the ACTUAL atlas transition function from chart α to chart β
+    (not an arbitrary coordinate change).
+
+    This implies the body-level cocycle `GlobalIntegralForm.compatible_body`
+    (by extracting the top θ-component and evaluating at θ = 0). -/
+def GlobalIntegralForm.SatisfiesSuperCocycle {dim : SuperDimension}
+    {M : Supermanifold dim} (ω : GlobalIntegralForm M) : Prop :=
+  ∀ (α β : SuperChart M)
+    (t : SuperTransition α β),
+    -- φ is the SuperCoordChange derived from the atlas transition t
+    let φ := t.toSuperCoordChange
+    ∀ (hD : ∀ x, (finiteGrassmannAlgebra dim.odd).IsInvertible
+      (φ.jacobian.toSuperMatrixAt x).D_lifted.det)
+    (hBD : ∀ x i j, ((φ.jacobian.toSuperMatrixAt x).Bblock *
+      (φ.jacobian.toSuperMatrixAt x).D_inv_carrier) i j ∈
+      (finiteGrassmannAlgebra dim.odd).odd)
+    (x : Fin dim.even → ℝ),
+    pullbackEvalAt φ (ω.localForms β) x (hD x) (hBD x) =
+    (ω.localForms α).coefficient.evalAtPoint x
+
 /-! ## Change of Variables Formula
 
 The key formula: under a super coordinate change φ,
@@ -92,9 +133,10 @@ theorem berezin_change_of_variables {p q : ℕ}
     (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar p bodyIntegral) :
     localBerezinIntegral U (IntegralForm.pullbackProper φ ω hD hBD) bodyIntegral =
     localBerezinIntegral V ω bodyIntegral := by
-  -- The proof reduces to the classical change of variables via:
-  -- 1. berezinIntegralOdd of pullback = body integral of f_top ∘ φ_body · |det J_body|
-  -- 2. Classical CoV: ∫_V f_top = ∫_U (f_top ∘ φ_body) |det J_body|
+  -- Proof requires:
+  -- 1. Show that pullbackProper extracts to (f ∘ φ_body) · |det J_body| at top θ-component
+  -- 2. Apply hChangeOfVar.change_of_var with Φ = φ.bodyMap
+  -- 3. Match the pointwise equality condition hfΦJ using Berezinian body-level identity
   sorry
 
 /-! ## Independence of Partition of Unity
@@ -114,45 +156,82 @@ This is the key well-definedness result for global integration. -/
     4. Reorder: = Σ_β ∫ (Σ_α ρ_α) σ_β f_β = Σ_β ∫ σ_β f_β -/
 theorem globalBerezinIntegral_independent_proper {dim : SuperDimension}
     (M : Supermanifold dim) (ω : GlobalIntegralForm M)
+    (hCocycle : ω.SatisfiesSuperCocycle)
     (pu₁ pu₂ : SuperPartitionOfUnity M)
-    (bodyIntegral : SmoothFunction dim.even → ℝ)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
     (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
-    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even
-        (fun f _U => bodyIntegral f)) :
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    -- Super-level partition of unity sum = 1 in a single chart.
+    -- For PU pu₁: after composing all functions to a common chart via transitions,
+    -- the sum equals 1 in the Grassmann algebra. This is the Witten-normalized
+    -- condition, proved by `normalizedPartition_sum_one` in PartitionOfUnity.lean.
+    (transitions₁ : pu₁.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum₁ : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum pu₁.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ pu₁.index pu₁.finIndex) (fun α =>
+          composeEvalAt (pu₁.functions α) (transitions₁ α) x) = 1)
+    -- Same for PU pu₂
+    (transitions₂ : pu₂.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum₂ : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum pu₂.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ pu₂.index pu₂.finIndex) (fun α =>
+          composeEvalAt (pu₂.functions α) (transitions₂ α) x) = 1) :
     globalBerezinIntegral M ω pu₁ bodyIntegral =
     globalBerezinIntegral M ω pu₂ bodyIntegral := by
-  -- Uses the double-sum trick:
-  -- Step 1: Σ_α ∫ ρ_α · f_α = Σ_α Σ_β ∫ ρ_α · σ_β · f_α  (insert Σ_β σ_β = 1)
-  -- Step 2: On overlaps, f_α = f_β · Ber(J)⁻¹ by cocycle condition
-  -- Step 3: Change of variables equates ∫...f_α dμ_α = ∫...f_β dμ_β
-  -- Step 4: Reorder sums: Σ_β (Σ_α ρ_α) · σ_β · f_β = Σ_β σ_β · f_β
+  -- Proof outline (double-sum trick, Witten §3.1):
+  -- 1. Insert 1 = Σ_β σ_β (using hSuperSum₂):
+  --    Σ_α ∫_{U_α} ρ_α f_α = Σ_{α,β} ∫_{U_α} ρ_α σ_β f_α
+  -- 2. On U_α ∩ U_β: use cocycle f_α = f_β · Ber(J_{αβ})⁻¹
+  -- 3. Change of variables: ∫_{U_α} ρ_α σ_β f_α dμ_α = ∫_{U_β} ρ_α σ_β f_β dμ_β
+  -- 4. Reorder: = Σ_β ∫_{U_β} (Σ_α ρ_α) σ_β f_β = Σ_β ∫_{U_β} σ_β f_β
+  --    (using hSuperSum₁: Σ_α ρ_α = 1)
   sorry
 
 /-! ## Global Codimension-1 Integral Forms -/
 
 /-- A global codimension-1 integral form on a supermanifold.
     In each chart, this is an IntegralFormCodim1.
-    On overlaps, the representations are compatible via Berezinian transformation. -/
+    On overlaps, the representations are compatible via Berezinian transformation.
+
+    The `compatible_body` condition ensures that applying the exterior derivative
+    chartwise produces a well-defined global top integral form (i.e., satisfies
+    the cocycle condition of `GlobalIntegralForm`). This is the minimal
+    compatibility condition needed for the global Stokes theorem.
+
+    Mathematically, this follows from the intrinsic codim-1 cocycle
+    ν_β = ν_α · Ber(J)⁻¹ · J (vector density transformation),
+    but we state the consequence directly to avoid developing the full
+    codim-1 transformation infrastructure. -/
 structure GlobalIntegralFormCodim1 {dim : SuperDimension} (M : Supermanifold dim) where
   /-- Local representations in each chart -/
   localForms : (chart : SuperChart M) → IntegralFormCodim1 dim.even dim.odd
-  /-- Body-level compatibility on overlaps (analogous to GlobalIntegralForm.compatible_body) -/
-  compatible_body : ∀ (α β : SuperChart M)
-      (_t : SuperTransition α β)
-      (_x : Fin dim.even → ℝ),
-      True  -- Placeholder for the cocycle condition on codimension-1 forms
+  /-- The exterior derivative of the local forms satisfies the top-form cocycle
+      on overlaps. This is the body-level condition:
+        d(ν_β)^top(T(x)) = d(ν_α)^top(x) · (det J)⁻¹
 
-/-- Apply the super exterior derivative chartwise to get a global integral form. -/
+      Uses the signed determinant (not |det|) because integral forms are sections
+      of the Berezinian bundle, not measure-theoretic densities.
+
+      This encodes compatibility of the codim-1 form under coordinate changes:
+      the divergence transforms as a scalar density of weight -1. -/
+  compatible_body : ∀ (α β : SuperChart M)
+      (t : SuperTransition α β)
+      (x : Fin dim.even → ℝ),
+      let bodyJac := Matrix.of fun i j =>
+        fderiv ℝ (fun y => (t.evenTransition i).body y) x (Pi.single j 1)
+      let bodyMap := fun i => (t.evenTransition i).body x
+      (superExteriorDerivativeCodim1 (localForms β)).coefficient.coefficients
+        Finset.univ bodyMap =
+      (superExteriorDerivativeCodim1 (localForms α)).coefficient.coefficients
+        Finset.univ x * (Matrix.det bodyJac)⁻¹
+
+/-- Apply the super exterior derivative chartwise to get a global integral form.
+    The cocycle condition is inherited from `GlobalIntegralFormCodim1.compatible_body`,
+    which directly states that d(ν) satisfies the top-form transformation law. -/
 noncomputable def globalExteriorDerivative {dim : SuperDimension} {M : Supermanifold dim}
     (ν : GlobalIntegralFormCodim1 M) : GlobalIntegralForm M where
   localForms := fun chart => superExteriorDerivativeCodim1 (ν.localForms chart)
-  compatible_body := by
-    -- The exterior derivative commutes with pullback:
-    -- d(ν_β) ∘ T_{αβ} · Ber(J)⁻¹ = d(ν_β ∘ T_{αβ} · Ber(J)⁻¹) = d(ν_α)
-    -- This requires: d commutes with composition and Berezinian multiplication
-    intro α β t x
-    -- The proof reduces to showing that d commutes with the coordinate change
-    sorry
+  compatible_body := ν.compatible_body
 
 /-! ## Global Stokes Theorem -/
 
@@ -166,56 +245,86 @@ noncomputable def globalExteriorDerivative {dim : SuperDimension} {M : Supermani
     **Proof outline** (Witten §3.5):
 
     1. **Decompose**: ∫_M dν = Σ_α ∫ ρ_α · (dν)_α  by definition
-    2. **Product rule**: ρ_α · dν = d(ρ_α · ν) - dρ_α ∧ ν
-       (Leibniz rule for the exterior derivative acting on integral forms)
+    2. **Leibniz rule**: ρ_α · dν = d(ρ_α · ν) - dρ_α ∧ ν
+       (product rule for the exterior derivative acting on integral forms)
     3. **Local Stokes**: ∫ d(ρ_α · ν) = 0
        because ρ_α · ν has compact support in chart α (ρ_α vanishes on ∂U_α),
-       and the local Stokes theorem gives ∫_U d(compactly supported) = 0.
+       and the divergence theorem gives ∫_U div(compactly supported) = 0.
     4. **Partition sum**: Σ_α dρ_α = d(Σ_α ρ_α) = d(1) = 0
        The derivative of the constant 1 vanishes.
     5. **Combining**: ∫_M dν = -Σ_α ∫ dρ_α ∧ ν = -∫ (Σ_α dρ_α) ∧ ν = 0
+
+    **IMPORTANT**: Individual ∫ ρ_α · dν_α do NOT vanish in general.
+    Only the SUM Σ_α ∫ ρ_α · dν_α = 0 holds, via steps 2-5 above.
 
     **Key infrastructure used**:
     - Local Stokes theorem: `super_stokes_codim1_no_boundary`
     - Partition of unity: `SuperPartitionOfUnity` with Σ ρ_α = 1
     - Exterior derivative: `superExteriorDerivativeCodim1`
-    - Pullback of integral forms: `IntegralForm.pullbackProper`
-    - Berezin change of variables: `berezin_change_of_variables`
-    - Global integral independence: `globalBerezinIntegral_independent_proper`
+    - Leibniz rule for d₀ on products (TODO: formalize in ExteriorDerivative.lean)
 
     **Hypotheses**:
-    - hp, hq: the supermanifold has positive even and odd dimensions
-    - ν: global codimension-1 integral form
-    - pu: super partition of unity
-    - bodyIntegral: abstract body integration functional
-    - hLinear: body integral is linear
-    - hLocalStokes: classical Stokes holds in each chart (compactly supported → ∫d = 0)
+    - `hDivThm`: classical divergence theorem on each chart's body domain
+      (∫_U div(F) = 0 for F compactly supported in U)
+    - The Leibniz rule d₀(ρ·ν) = ρ·d₀ν + Σᵢ(-1)ⁱ(∂ρ/∂xⁱ)fᵢ and the
+      partition derivative cancellation d(Σρ_α) = 0 are needed for the proof
+      but not taken as hypotheses — they should be derived from definitions.
 
     This is the fundamental theorem of super integration theory. -/
 theorem global_super_stokes_no_boundary {dim : SuperDimension}
     (M : Supermanifold dim) (hp : 0 < dim.even) (hq : 0 < dim.odd)
     (ν : GlobalIntegralFormCodim1 M)
     (pu : SuperPartitionOfUnity M)
-    (bodyIntegral : SmoothFunction dim.even → ℝ)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
     (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
-    -- Classical Stokes in each chart: ∫ d(compactly supported) = 0
-    (hLocalStokes : ∀ (α : pu.index),
-      let dνα := superExteriorDerivativeCodim1 (ν.localForms (pu.charts α))
-      let ρα_dν := IntegralForm.mulByFunction (pu.functions α) dνα
-      localBerezinIntegral (pu.supportDomains α) ρα_dν
-        (fun f U => bodyIntegral f) = 0) :
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    -- Classical divergence theorem on each chart: ∫_U div(F) = 0 for
+    -- vector fields F compactly supported in U.
+    -- This is the genuine classical hypothesis needed from real analysis.
+    (hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
+      -- F is compactly supported in chart α's domain
+      (∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0) →
+      bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0)
+    -- Super-level partition of unity sum = 1 in a single chart.
+    -- After composing all PU functions to a common chart via transitions,
+    -- the sum equals 1 in the Grassmann algebra.
+    -- Proved by normalizedPartition_sum_one in PartitionOfUnity.lean.
+    -- Needed for Step 4: ∂(Σ ρ_α)/∂xⁱ = 0.
+    (transitions : pu.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ pu.index pu.finIndex) (fun α =>
+          composeEvalAt (pu.functions α) (transitions α) x) = 1) :
     globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral = 0 := by
-  -- The hypothesis hLocalStokes directly states that each chart's contribution
-  -- ∫ ρ_α · (dν)_α = 0. The global integral is the sum of these contributions.
-  -- (The Leibniz rule, partition derivative vanishing, etc. are all encoded in hLocalStokes.)
-  unfold globalBerezinIntegral
-  apply Finset.sum_eq_zero
-  intro α _
-  have h := hLocalStokes α
-  -- h : localBerezinIntegral ... (IntegralForm.mulByFunction ρ_α dν_α) (fun f U => bodyIntegral f) = 0
-  -- Unfold localBerezinIntegral and IntegralForm.mulByFunction to match the goal
-  simp only [localBerezinIntegral, IntegralForm.mulByFunction] at h
-  exact h
+  -- Proof requires (all currently unformalized):
+  --
+  -- Step 1: Expand globalBerezinIntegral as Σ_α ∫_{U_α} ρ_α · (dν)_α
+  --
+  -- Step 2: Leibniz rule for d₀ on products:
+  --   d₀(ρ_α · ν_α) = ρ_α · d₀(ν_α) + Σᵢ (-1)ⁱ (∂ρ_α/∂xⁱ) · fᵢ,α
+  --   where ν_α = Σᵢ fᵢ,α d̂xⁱ · δ(dθ)
+  --   (This is the Leibniz/product rule for the even exterior derivative)
+  --
+  -- Step 3: For each α, ρ_α · ν_α has compact support in U_α, so:
+  --   ∫ d₀(ρ_α · ν_α) = ∫ div(signed components of ρ_α · ν_α) = 0
+  --   by d0_is_divergence + hDivThm
+  --
+  -- Step 4: The Leibniz correction terms sum to zero:
+  --   Σ_α Σᵢ (-1)ⁱ ∫ (∂ρ_α/∂xⁱ) · fᵢ,α = Σᵢ (-1)ⁱ ∫ (Σ_α ∂ρ_α/∂xⁱ) · fᵢ
+  --   = Σᵢ (-1)ⁱ ∫ ∂(Σ_α ρ_α)/∂xⁱ · fᵢ = 0
+  --   because Σ_α ρ_α = 1 (super PU), so ∂1/∂xⁱ = 0.
+  --
+  -- Step 5: Combining:
+  --   ∫_M dν = Σ_α ∫ ρ_α · d₀ν_α
+  --          = Σ_α [∫ d₀(ρ_α · ν_α) - correction_α]
+  --          = 0 - 0 = 0
+  --
+  -- Infrastructure needed:
+  -- (a) Leibniz rule for d₀ on products of super functions with codim-1 forms
+  -- (b) Connection between ρ_α · ν_α and the signed Berezin components
+  -- (c) Compact support of ρ_α · ν_α (from pu.support_subset)
+  -- (d) The partition derivative identity ∂(Σ ρ_α)/∂xⁱ = 0
+  sorry
 
 /-! ## Consequences -/
 
@@ -227,14 +336,19 @@ theorem exact_form_integrates_to_zero {dim : SuperDimension}
     (M : Supermanifold dim) (hp : 0 < dim.even) (hq : 0 < dim.odd)
     (ν : GlobalIntegralFormCodim1 M)
     (pu : SuperPartitionOfUnity M)
-    (bodyIntegral : SmoothFunction dim.even → ℝ)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
     (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
-    (hLocalStokes : ∀ (α : pu.index),
-      let dνα := superExteriorDerivativeCodim1 (ν.localForms (pu.charts α))
-      let ρα_dν := IntegralForm.mulByFunction (pu.functions α) dνα
-      localBerezinIntegral (pu.supportDomains α) ρα_dν
-        (fun f U => bodyIntegral f) = 0) :
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
+      (∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0) →
+      bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0)
+    (transitions : pu.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ pu.index pu.finIndex) (fun α =>
+          composeEvalAt (pu.functions α) (transitions α) x) = 1) :
     globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral = 0 :=
-  global_super_stokes_no_boundary M hp hq ν pu bodyIntegral hLinear hLocalStokes
+  global_super_stokes_no_boundary M hp hq ν pu bodyIntegral hLinear hChangeOfVar hDivThm
+    transitions hSuperSum
 
 end Supermanifolds

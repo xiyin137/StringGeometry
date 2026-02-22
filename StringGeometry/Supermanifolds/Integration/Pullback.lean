@@ -86,10 +86,54 @@ theorem berezinianCarrierAt_grassmannSmooth {p q : ℕ} (φ : SuperCoordChange p
       (finiteGrassmannAlgebra q).odd) :
     GrassmannSmooth (fun x => berezinianCarrierAt φ x (hD x) (hBD x)) := by
   -- The Berezinian = det(Schur complement) · det(D)⁻¹
-  -- Both are algebraic in the Jacobian entries (smooth), plus (det D_body)⁻¹ (smooth).
-  -- The Classical.choose in Λ.inv must equal the geometric series (by uniqueness of inverses),
-  -- which is polynomial in the entries.
-  sorry
+  -- ber.val = det(schurD_lifted).val * (Λ.inv(det(D_lifted))).val by evenVal_mul
+  -- Each factor is algebraic in the Jacobian entries (smooth) and the Grassmann inverse (smooth).
+  let Mx := fun x => φ.jacobian.toSuperMatrixAt x
+  -- Step 1: D_lifted entries .val = Dblock entries are GrassmannSmooth
+  have hDL : ∀ i j, GrassmannSmooth (fun x => ((Mx x).D_lifted i j).val) := by
+    intro i j
+    have h : ∀ x, ((Mx x).D_lifted i j).val = (Mx x).Dblock i j :=
+      fun x => (finiteGrassmannAlgebra q).liftEvenMatrix_spec _ _ i j
+    simp_rw [h]
+    exact evalAtPoint_grassmannSmooth (φ.jacobian.Dblock i j)
+  -- Step 2: D_lifted⁻¹ entries .val are GrassmannSmooth (by matInv_even_grassmannSmooth)
+  have hDLinv : ∀ i j, GrassmannSmooth (fun x => ((Mx x).D_lifted⁻¹ i j).val) :=
+    matInv_even_grassmannSmooth hDL hD
+  -- Step 3: D_inv_carrier entries are GrassmannSmooth
+  -- D_inv_carrier = matrixEvenToCarrier(D_lifted⁻¹), so entries = (D_lifted⁻¹ entries).val
+  have hDinvC : ∀ i j, GrassmannSmooth (fun x => (Mx x).D_inv_carrier i j) := by
+    intro i j
+    show GrassmannSmooth (fun x => ((Mx x).D_lifted⁻¹ i j).val)
+    exact hDLinv i j
+  -- Step 4: A, B, C block entries are GrassmannSmooth
+  have hA : ∀ i j, GrassmannSmooth (fun x => (Mx x).Ablock i j) :=
+    fun i j => evalAtPoint_grassmannSmooth (φ.jacobian.Ablock i j)
+  have hB : ∀ i j, GrassmannSmooth (fun x => (Mx x).Bblock i j) :=
+    fun i j => evalAtPoint_grassmannSmooth (φ.jacobian.Bblock i j)
+  have hC : ∀ i j, GrassmannSmooth (fun x => (Mx x).Cblock i j) :=
+    fun i j => evalAtPoint_grassmannSmooth (φ.jacobian.Cblock i j)
+  -- Step 5: schurD_carrier entries are GrassmannSmooth (A - B*D_inv*C)
+  have hSchur : ∀ i j, GrassmannSmooth (fun x => (Mx x).schurD_carrier i j) :=
+    matSub_grassmannSmooth hA
+      (matMul_grassmannSmooth (matMul_grassmannSmooth hB hDinvC) hC)
+  -- Step 6: schurD_lifted entries .val = schurD_carrier entries are GrassmannSmooth
+  have hSL : ∀ i j, GrassmannSmooth (fun x =>
+      ((finiteGrassmannAlgebra q).liftEvenMatrix (Mx x).schurD_carrier
+        ((Mx x).schurD_even (hBD x)) i j).val) := by
+    intro i j
+    have h : ∀ x, ((finiteGrassmannAlgebra q).liftEvenMatrix (Mx x).schurD_carrier
+        ((Mx x).schurD_even (hBD x)) i j).val = (Mx x).schurD_carrier i j :=
+      fun x => (finiteGrassmannAlgebra q).liftEvenMatrix_spec _ _ i j
+    simp_rw [h]; exact hSchur i j
+  -- Step 7: Combine. ber.val = det(schurD).val * inv(det(D)).val
+  have h_eq : ∀ x, berezinianCarrierAt φ x (hD x) (hBD x) =
+      ((finiteGrassmannAlgebra q).liftEvenMatrix (Mx x).schurD_carrier
+        ((Mx x).schurD_even (hBD x))).det.val *
+      ((finiteGrassmannAlgebra q).inv ((Mx x).D_lifted.det) (hD x)).val := by
+    intro x; exact evenVal_mul _ _
+  simp_rw [h_eq]
+  exact (det_even_grassmannSmooth hSL).mul
+    (finiteGrassmann_inv_grassmannSmooth (det_even_grassmannSmooth hDL) hD)
 
 /-! ## Full Pullback as IntegralForm -/
 

@@ -369,7 +369,7 @@ theorem GrassmannSmooth.zsmul_const {p q : ℕ} (n : ℤ)
   exact contDiff_const.mul (hf J)
 
 /-- `.val` distributes over multiplication for FiniteGrassmannEven. -/
-private theorem evenVal_mul {q : ℕ} (a b : FiniteGrassmannEven q) :
+theorem evenVal_mul {q : ℕ} (a b : FiniteGrassmannEven q) :
     (a * b).val = a.val * b.val :=
   (evenToCarrierHom (q := q)).map_mul a b
 
@@ -447,5 +447,81 @@ theorem matSub_grassmannSmooth {p q n m : ℕ}
   intro i j
   show GrassmannSmooth (fun x => A x i j - B x i j)
   exact (hA i j).sub (hB i j)
+
+/-! ## Ring.inverse Bridge and Matrix Inverse Smoothness -/
+
+/-- Ring.inverse on evenCarrier agrees with GrassmannAlgebra.inv
+    when the element is invertible (body ≠ 0). Both are the unique two-sided inverse. -/
+theorem ringInverse_eq_grassmannInv {q : ℕ} (a : (finiteGrassmannAlgebra q).evenCarrier)
+    (h : (finiteGrassmannAlgebra q).IsInvertible a) :
+    Ring.inverse a = (finiteGrassmannAlgebra q).inv a h := by
+  have hU := ((finiteGrassmannAlgebra q).isUnit_iff_body_ne_zero a).mpr h
+  calc Ring.inverse a
+      = 1 * Ring.inverse a := (one_mul _).symm
+    _ = ((finiteGrassmannAlgebra q).inv a h * a) * Ring.inverse a := by
+          rw [(finiteGrassmannAlgebra q).inv_mul a h]
+    _ = (finiteGrassmannAlgebra q).inv a h * (a * Ring.inverse a) := mul_assoc _ _ _
+    _ = (finiteGrassmannAlgebra q).inv a h * 1 := by
+          rw [Ring.mul_inverse_cancel a hU]
+    _ = (finiteGrassmannAlgebra q).inv a h := mul_one _
+
+/-- Ring.inverse of an even element with invertible body has GrassmannSmooth .val. -/
+theorem ringInverse_even_grassmannSmooth {p q : ℕ}
+    {f : (Fin p → ℝ) → (finiteGrassmannAlgebra q).evenCarrier}
+    (hf : GrassmannSmooth (fun x => (f x).val))
+    (hInv : ∀ x, (finiteGrassmannAlgebra q).IsInvertible (f x)) :
+    GrassmannSmooth (fun x => (Ring.inverse (f x)).val) := by
+  have h_eq : ∀ x, (Ring.inverse (f x)).val =
+      ((finiteGrassmannAlgebra q).inv (f x) (hInv x)).val :=
+    fun x => congrArg Subtype.val (ringInverse_eq_grassmannInv (f x) (hInv x))
+  simp_rw [h_eq]
+  exact finiteGrassmann_inv_grassmannSmooth hf hInv
+
+/-- Adjugate of an even-valued matrix with GrassmannSmooth entries has GrassmannSmooth .val
+    entries. Uses: adjugate M i j = det(M.updateRow j (Pi.single i 1)). -/
+theorem adjugate_even_grassmannSmooth {p q n : ℕ}
+    {M : (Fin p → ℝ) → Matrix (Fin n) (Fin n) (finiteGrassmannAlgebra q).evenCarrier}
+    (hM : ∀ i j, GrassmannSmooth (fun x => (M x i j).val)) :
+    ∀ i j, GrassmannSmooth (fun x => ((M x).adjugate i j).val) := by
+  intro i0 j0
+  -- adjugate M i0 j0 = det(M.updateRow j0 (Pi.single i0 1))
+  simp_rw [Matrix.adjugate_apply]
+  -- Apply det_even_grassmannSmooth to the updated matrix
+  apply det_even_grassmannSmooth
+  intro k l
+  -- Expand updateRow to if-then-else, then split on whether k = j0
+  simp_rw [Matrix.updateRow_apply]
+  by_cases hk : k = j0
+  · -- Row j0: entry is Pi.single i0 1 l (constant in x)
+    simp_rw [if_pos hk]
+    exact GrassmannSmooth.const _
+  · -- Other rows: entry is M x k l (GrassmannSmooth by hypothesis)
+    simp_rw [if_neg hk]
+    exact hM k l
+
+/-- Matrix inverse entries over evenCarrier with GrassmannSmooth .val entries have
+    GrassmannSmooth .val, when the determinant is invertible at every point.
+
+    Uses: M⁻¹ = Ring.inverse(det M) • adjugate(M), so each entry is
+    Ring.inverse(det M) * adjugate(M) i j. -/
+theorem matInv_even_grassmannSmooth {p q n : ℕ}
+    {M : (Fin p → ℝ) → Matrix (Fin n) (Fin n) (finiteGrassmannAlgebra q).evenCarrier}
+    (hM : ∀ i j, GrassmannSmooth (fun x => (M x i j).val))
+    (hDet : ∀ x, (finiteGrassmannAlgebra q).IsInvertible (M x).det) :
+    ∀ i j, GrassmannSmooth (fun x => ((M x)⁻¹ i j).val) := by
+  intro i j
+  -- M⁻¹ = Ring.inverse(det M) • adjugate(M)
+  -- Each entry: (M⁻¹ i j) = Ring.inverse(det M) * adjugate(M) i j
+  have h_entry : ∀ x, ((M x)⁻¹ i j).val =
+      (Ring.inverse (M x).det).val * ((M x).adjugate i j).val := by
+    intro x
+    -- M⁻¹ = Ring.inverse(det M) • adjugate(M) by definition
+    change ((Ring.inverse (M x).det • (M x).adjugate) i j).val = _
+    -- (c • N) i j = c * N i j
+    show (Ring.inverse (M x).det * (M x).adjugate i j).val = _
+    exact evenVal_mul _ _
+  simp_rw [h_entry]
+  exact (ringInverse_even_grassmannSmooth (det_even_grassmannSmooth hM) hDet).mul
+    (adjugate_even_grassmannSmooth hM i j)
 
 end Supermanifolds

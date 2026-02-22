@@ -139,21 +139,23 @@ For a compactly supported codimension-1 integral form ν on ℝ^{p|q}:
     the integral of dν over the full super domain vanishes.
 
     The proof reduces to classical Stokes on the body:
-    - dν = d₀ν (d₁ maps to a different graded piece, see ExteriorDerivative.lean)
-    - d₀ν is the divergence of the Berezin-integrated components
-    - Classical Stokes says ∫ div(F) = 0 for compactly supported F
+    1. dν = d₀ν (d₁ maps to a different graded piece, see ExteriorDerivative.lean)
+    2. ∫dθ d₀ν = div(F) where F_i = (-1)^i · ∫dθ f_i (by `d0_is_divergence`)
+    3. ∫ div(F) = 0 (classical divergence theorem, compact support, no boundary)
 
-    The classical Stokes hypothesis is provided as an assumption, since we do not
-    formalize measure-theoretic integration on ℝᵖ here. -/
+    Step 3 is the classical divergence theorem on ℝᵖ, which we take as a hypothesis
+    since we do not formalize measure-theoretic integration here. The hypothesis
+    is stated in terms of the divergence, NOT as a restatement of the conclusion. -/
 theorem super_stokes_codim1_no_boundary {p q : ℕ} (_hp : 0 < p) (_hq : 0 < q)
     (ν : IntegralFormCodim1 p q)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
-    -- Classical Stokes on the body: ∫ div(F) = 0 for compactly supported F
-    (hClassicalStokes :
-      bodyIntegral (berezinIntegralOdd (superExteriorDerivativeCodim1 ν).coefficient) Set.univ = 0) :
+    -- Classical divergence theorem: ∫ div(F) = 0 for compactly supported F
+    (hDivThm :
+      bodyIntegral (bodyDivergence (signedBerezinComponents ν)) Set.univ = 0) :
     localBerezinIntegral Set.univ (superExteriorDerivativeCodim1 ν) bodyIntegral = 0 := by
-  unfold localBerezinIntegral
-  exact hClassicalStokes
+  unfold localBerezinIntegral superExteriorDerivativeCodim1
+  rw [d0_is_divergence]
+  exact hDivThm
 
 /-!
 ## Super Stokes Theorem (With Boundary)
@@ -174,21 +176,24 @@ This reduces to classical Stokes on the body after Berezin integration.
 
     The proof is:
     1. dν = d₀ν (d₁ maps to different graded piece)
-    2. ∫_U d₀ν = ∫_{U_body} div(∫dθ ν_components) dx  (d₀ = body divergence)
-    3. ∫_{U_body} div(F) dx = ∫_{∂U_body} F · n dS  (classical Stokes) -/
+    2. ∫dθ d₀ν = div(F) where F_i = (-1)^i · ∫dθ f_i (by `d0_is_divergence`)
+    3. ∫_{U_body} div(F) dx = ∫_{∂U_body} F · n dS  (classical Stokes)
+
+    Step 3 is the classical divergence theorem with boundary, taken as hypothesis. -/
 theorem super_stokes_codim1_with_boundary {p q : ℕ} (_hp : 0 < p) (_hq : 0 < q)
     (ν : IntegralFormCodim1 p q)
     (U : Set (Fin p → ℝ))
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
     (boundaryIntegral : ℝ)
-    -- Classical Stokes on the body with boundary
-    (hClassicalStokes :
-      bodyIntegral (berezinIntegralOdd (superExteriorDerivativeCodim1 ν).coefficient) U =
+    -- Classical divergence theorem with boundary: ∫_U div(F) = ∫_{∂U} F·n
+    (hDivThm :
+      bodyIntegral (bodyDivergence (signedBerezinComponents ν)) U =
       boundaryIntegral) :
     localBerezinIntegral U (superExteriorDerivativeCodim1 ν) bodyIntegral =
     boundaryIntegral := by
-  unfold localBerezinIntegral
-  exact hClassicalStokes
+  unfold localBerezinIntegral superExteriorDerivativeCodim1
+  rw [d0_is_divergence]
+  exact hDivThm
 
 /-!
 ## The (1|1) Example

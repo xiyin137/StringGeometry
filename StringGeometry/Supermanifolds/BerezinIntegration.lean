@@ -150,6 +150,22 @@ structure SuperCoordChange (p q : ℕ) where
   /-- Odd coordinates transform as odd functions -/
   oddMap_odd : ∀ a I, I.card % 2 = 0 → (oddMap a).coefficients I = SmoothFunction.const 0
 
+/-- Convert a `SuperTransition` to a `SuperCoordChange`.
+
+    Both structures carry the same data (even/odd coordinate maps with parity conditions),
+    but `SuperTransition` also records the charts and overlap region, and has extra data
+    about the body map (diffeomorphism, invertibility) that `SuperCoordChange` does not.
+
+    The parity conditions `= 0` in `SuperTransition` and `= SmoothFunction.const 0`
+    in `SuperCoordChange` are definitionally equal via the `Zero` instance on `SmoothFunction`. -/
+def SuperTransition.toSuperCoordChange {dim : SuperDimension} {M : Supermanifold dim}
+    {chart₁ chart₂ : SuperChart M} (t : SuperTransition chart₁ chart₂) :
+    SuperCoordChange dim.even dim.odd where
+  evenMap := t.evenTransition
+  oddMap := t.oddTransition
+  evenMap_even := fun i I hI => t.evenTransition_even i I hI
+  oddMap_odd := fun a I hI => t.oddTransition_odd a I hI
+
 /-- The super-Jacobian of a coordinate change.
 
     For a super coordinate change φ: (x, θ) ↦ (x'(x,θ), θ'(x,θ)), the Jacobian is:
@@ -225,6 +241,16 @@ noncomputable def SuperCoordChange.jacobian {p q : ℕ} (φ : SuperCoordChange p
       -- ((-1)^n : ℝ) • (SmoothFunction.const 0) = 0
       have hzero : SmoothFunction.const 0 = (0 : SmoothFunction p) := rfl
       rw [hzero, smul_zero]
+
+/-- The Jacobian of a `SuperTransition.toSuperCoordChange` equals `SuperTransition.toSuperJacobian`.
+
+    Both compute the same partial derivatives of the same coordinate functions,
+    so they are definitionally equal. -/
+theorem SuperTransition.toSuperCoordChange_jacobian_eq {dim : SuperDimension}
+    {M : Supermanifold dim} {chart₁ chart₂ : SuperChart M}
+    (t : SuperTransition chart₁ chart₂) :
+    t.toSuperCoordChange.jacobian = t.toSuperJacobian := by
+  rfl
 
 /-- Pullback of an integral form under a coordinate change.
 
@@ -339,16 +365,38 @@ structure SuperCoordChange.IsDiffeoOn {p q : ℕ} (φ : SuperCoordChange p q)
       ContDiff ℝ ⊤ ψ ∧ Set.MapsTo ψ V U ∧
       (∀ x ∈ U, ψ (φ.bodyMap x) = x) ∧ (∀ y ∈ V, φ.bodyMap (ψ y) = y)
 
-/-- The body integral satisfies the standard change of variables formula on ℝ^p. -/
+/-- The body integral satisfies the change of variables formula on ℝ^p.
+
+    For an orientation-preserving diffeomorphism Φ : U → V:
+      ∫_V f dy = ∫_U (f ∘ Φ) · det(DΦ) dx
+
+    This uses the SIGNED determinant because the body integral arises from
+    Berezin integration of integral forms (sections of the Berezinian bundle),
+    which transform by the signed Berezinian = det(A)/det(D). After the
+    det(D) cancellation in the Berezin integral, what remains is signed det(A).
+
+    For oriented supermanifolds, the transitions preserve orientation,
+    so det(DΦ) > 0 and the sign doesn't matter in practice. But using
+    signed det is the correct formulation for forms rather than measures. -/
 structure BodyIntegral.SatisfiesChangeOfVar (p : ℕ)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ) : Prop where
-  /-- For a diffeomorphism Φ : U → V with smooth Jacobian J,
-      ∫_V f dy = ∫_U (f ∘ Φ) |det J| dx.
-      The composed function (f ∘ Φ) · J is provided as a SmoothFunction
-      (the caller is responsible for constructing it with a smoothness proof). -/
+  /-- For a smooth diffeomorphism Φ : U → V,
+      ∫_V f dy = ∫_U (f ∘ Φ) · det(DΦ) dx.
+
+      The right-hand side uses a `SmoothFunction` packaging `(f ∘ Φ) · det J`
+      together with a proof that it equals this expression pointwise.
+      This avoids requiring the caller to separately prove smoothness of the
+      composed expression (which would need significant real analysis infrastructure). -/
   change_of_var : ∀ (U V : Set (Fin p → ℝ))
-      (f : SmoothFunction p) (fΦJ : SmoothFunction p),
-      -- fΦJ represents (f ∘ Φ) · |det J| as a smooth function
+      (Φ : (Fin p → ℝ) → (Fin p → ℝ))
+      (hΦ : ContDiff ℝ ⊤ Φ)
+      (hBij : Set.BijOn Φ U V)
+      (f : SmoothFunction p)
+      -- The composed integrand, packaged as a SmoothFunction
+      (fΦJ : SmoothFunction p)
+      -- Pointwise equality: fΦJ(x) = f(Φ(x)) · det(DΦ(x))
+      (hfΦJ : ∀ x, fΦJ.toFun x = f.toFun (Φ x) *
+        (fderiv ℝ Φ x).det),
       bodyIntegral f V = bodyIntegral fΦJ U
 
 theorem berezin_change_of_variables_formula {p q : ℕ}
@@ -452,17 +500,14 @@ So if we integrate f(y,η) [Dy Dη]:
     These are essential for the change of variables formula to be consistent
     under composition of coordinate changes. -/
 
-/-- Sign convention for Berezin integration: ∫dθ²dθ¹ = -∫dθ¹dθ² .
+/-- Unfold `berezinIntegralOdd` to its definition (extracts top θ-component).
 
-    The odd measures anticommute, consistent with the graded structure.
-
-    This is built into the definition: the top component of θ^I is computed
-    with `reorderSign I J` which handles the Grassmann algebra sign conventions.
-
-    For a permutation σ of {1,...,q}, we have:
-      [Dθ^{σ(1)}...Dθ^{σ(q)}] = sign(σ) · [Dθ¹...Dθ^q]
-
-    This follows from the anticommutativity of the Grassmann generators. -/
+    **Note**: Despite its name, this is just the definitional unfolding of
+    `berezinIntegralOdd`. The actual anticommutativity of Berezin measures
+    is encoded in the `reorderSign` within `SuperDomainFunction.mul`, not here.
+    The name is misleading — this theorem has no content about sign conventions. -/
+-- MISLEADING NAME: This is just `rfl` unfolding berezinIntegralOdd.
+-- The actual anticommutativity is in reorderSign within SuperDomainFunction.mul.
 theorem berezin_measure_anticommute {p q : ℕ} (f : SuperDomainFunction p q) :
     berezinIntegralOdd f = f.coefficients Finset.univ := rfl
 
@@ -598,6 +643,12 @@ structure SuperPartitionOfUnity {dim : SuperDimension} (M : Supermanifold dim) w
         (fun h => (functions α).body
           (fun i => ((charts α).bodyCoord ⟨p, h⟩ : EuclideanSpace ℝ (Fin dim.even)) i))
         (fun _ => 0)) = 1
+  -- Super-level sum to 1: The Witten construction (lift body PU, compose to
+  -- common chart, raw sum = 1 + nilpotent, divide by sum) produces partition
+  -- functions whose composed sum in any single chart equals 1 as a Grassmann
+  -- algebra element. This property requires `composeEvalAt` (SuperCompose.lean)
+  -- and is taken as a hypothesis `hSuperSum` in GlobalStokes.lean theorems.
+  -- It is proved by `normalizedPartition_sum_one` in PartitionOfUnity.lean.
 
 /-- Lift a smooth function on the body to a super function (constant in θ).
 
@@ -701,19 +752,24 @@ structure GlobalIntegralForm {dim : SuperDimension} (M : Supermanifold dim) wher
   /-- Body-level compatibility on overlaps.
 
       The full super cocycle condition is: f_β ∘ T = f_α · Ber(J_{αβ})⁻¹
-      where Ber is the Berezinian (superdeterminant) of the super Jacobian.
+      where Ber is the Berezinian of the super Jacobian. This requires
+      `composeEvalAt` from SuperCompose.lean (downstream of this file).
 
-      At body level (θ = 0), this reduces to:
-        f_β^{top}(T_body(x)) = f_α^{top}(x) · |det(∂T_body/∂x)|⁻¹
+      At body level (θ = 0), the det(D_body) from the odd substitution θ'=Dθ
+      cancels with 1/det(D) in the Berezinian denominator (verified by direct
+      computation in (1|1) case), giving:
+        f_β^{top}(T_body(x)) = f_α^{top}(x) · (det(∂T_body/∂x))⁻¹
 
       where T_body is the body map of the transition and f^{top} is the top
       θ-component (extracted by berezinIntegralOdd).
 
-      **Full super cocycle**: Requires super function composition to express
-      f_β ∘ T_{αβ}. The Berezinian is available via `SuperTransition.berezinianAt`.
-      The full condition is: for all θ-components I,
-        (f_β ∘ T_{αβ}).coefficients I = (f_α · Ber(J)⁻¹).coefficients I
-      This will be formulated once composition infrastructure (Phase 3) is in place. -/
+      Note: This uses the SIGNED determinant (not |det|) because integral forms
+      are sections of the Berezinian line bundle, which transforms by the signed
+      Berezinian. The absolute value would only be appropriate for densities
+      in measure-theoretic integration.
+
+      The full super cocycle is stated as an additional hypothesis in
+      GlobalStokes.lean where the composition infrastructure is available. -/
   compatible_body : ∀ (α β : SuperChart M)
       (t : SuperTransition α β)
       (x : Fin dim.even → ℝ),
@@ -722,7 +778,7 @@ structure GlobalIntegralForm {dim : SuperDimension} (M : Supermanifold dim) wher
       let bodyMap := fun i => (t.evenTransition i).body x
       (localForms β).coefficient.coefficients Finset.univ bodyMap =
       (localForms α).coefficient.coefficients Finset.univ x *
-      |Matrix.det bodyJac|⁻¹
+      (Matrix.det bodyJac)⁻¹
 
 /-- The global Berezin integral of an integral form on a supermanifold.
 
@@ -745,32 +801,35 @@ structure GlobalIntegralForm {dim : SuperDimension} (M : Supermanifold dim) wher
 noncomputable def globalBerezinIntegral {dim : SuperDimension}
     (_M : Supermanifold dim) (ω : GlobalIntegralForm _M)
     (pu : SuperPartitionOfUnity _M)
-    (bodyIntegral : SmoothFunction dim.even → ℝ) : ℝ :=
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ) : ℝ :=
   -- Sum over the partition of unity index
   -- For each α: compute ∫dθ (ρ_α · f_α) in chart α's coordinates,
-  -- then body-integrate the resulting smooth function over ℝ^p.
-  -- Each summand is compactly supported in chart α's image (by support_subset),
-  -- so the Lebesgue integral localizes correctly.
+  -- then body-integrate the resulting smooth function over chart α's support domain.
+  -- Each summand is compactly supported in chart α's domain (by support_subset),
+  -- so the body integral localizes to the support domain.
   @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex) fun α =>
     bodyIntegral
       (berezinIntegralOdd
         (SuperDomainFunction.mul (pu.functions α)
           (ω.localForms (pu.charts α)).coefficient))
+      (pu.supportDomains α)
 
-/-- Linearity of a body integral functional. -/
-structure BodyIntegral.IsLinear (p : ℕ) (bodyIntegral : SmoothFunction p → ℝ) : Prop where
-  /-- Additivity: ∫(f + g) = ∫f + ∫g -/
-  add : ∀ f g, bodyIntegral (f + g) = bodyIntegral f + bodyIntegral g
-  /-- Scalar multiplication: ∫(c·f) = c·∫f -/
-  smul : ∀ (c : ℝ) f, bodyIntegral (c • f) = c * bodyIntegral f
+/-- Linearity of a body integral functional.
+
+    The body integral ∫_U f dx is linear in f for each fixed domain U. -/
+structure BodyIntegral.IsLinear (p : ℕ)
+    (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ) : Prop where
+  /-- Additivity: ∫_U (f + g) = ∫_U f + ∫_U g -/
+  add : ∀ U f g, bodyIntegral (f + g) U = bodyIntegral f U + bodyIntegral g U
+  /-- Scalar multiplication: ∫_U (c·f) = c · ∫_U f -/
+  smul : ∀ (c : ℝ) f U, bodyIntegral (c • f) U = c * bodyIntegral f U
 
 theorem globalBerezinIntegral_independent {dim : SuperDimension}
     (M : Supermanifold dim) (ω : GlobalIntegralForm M)
     (pu₁ pu₂ : SuperPartitionOfUnity M)
-    (bodyIntegral : SmoothFunction dim.even → ℝ)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
     (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
-    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even
-        (fun f U => bodyIntegral f)) :
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral) :
     globalBerezinIntegral M ω pu₁ bodyIntegral =
     globalBerezinIntegral M ω pu₂ bodyIntegral := by
   -- **Mathematical Proof Outline**:
@@ -1080,16 +1139,21 @@ BRST invariance of amplitudes follows from:
 where Φ is the product of vertex operators.
 -/
 
-/-- Super Stokes' theorem (legacy version).
+/-- Super Stokes' theorem (LEGACY — TAUTOLOGICAL, DO NOT USE).
 
-    The proper Stokes theorem is proved in `Integration/StokesTheorem.lean`:
-    - `super_stokes_codim1_no_boundary`: ∫ dν = 0 (without boundary)
-    - `super_stokes_codim1_with_boundary`: ∫_U dν = ∫_{∂U} ν (with boundary)
-    - `berezin_d1_vanishes`: ∫dθ d₁ν = 0 (key lemma)
+    **WARNING**: This theorem is tautological — the hypothesis `hStokesBody`
+    directly restates the conclusion after unfolding `localBerezinIntegral`.
+    It has zero mathematical content.
+
+    Use the proper versions in `Integration/StokesTheorem.lean` instead:
+    - `super_stokes_codim1_no_boundary`: genuinely reduces super Stokes to
+      classical divergence theorem via `d0_is_divergence`
+    - `super_stokes_codim1_with_boundary`: same with boundary terms
 
     Those theorems properly decompose d = d₀ + d₁ and prove:
     1. d₁ν integrates to 0 (no boundary in odd directions)
-    2. d₀ν reduces to classical Stokes on the body -/
+    2. d₀ν reduces to classical divergence on the body -/
+-- TAUTOLOGICAL: hypothesis restates conclusion. See StokesTheorem.lean for proper versions.
 theorem super_stokes {p q : ℕ} (_hp : 0 < p)
     (U : Set (Fin p → ℝ))
     (_hU_compact : IsCompact U)
@@ -1152,8 +1216,9 @@ structure CompactlySupportedIntegralForm (p q : ℕ) extends IntegralForm p q wh
     is well-defined without boundary conditions. -/
 noncomputable def integrateCompactSupport {p q : ℕ}
     (ω : CompactlySupportedIntegralForm p q)
-    (bodyIntegral : SmoothFunction p → ℝ) : ℝ :=
-  bodyIntegral (berezinIntegralOdd ω.coefficient)
+    (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
+    (U : Set (Fin p → ℝ)) : ℝ :=
+  bodyIntegral (berezinIntegralOdd ω.coefficient) U
 
 /-!
 ## Fubini's Theorem for Supermanifolds
@@ -1168,28 +1233,20 @@ The key point is that Berezin integration over odd variables is algebraic,
 so the order of integration does not matter.
 -/
 
-/-- Fubini's theorem for Berezin integration.
+/-- Unfold `berezinIntegralOdd` on a product domain (definitional equality).
 
-    For super domains ℝ^{p|q} and ℝ^{r|s}, and a function f(x,y,θ,η):
-      ∫ dθ dη f = ∫ dθ (∫ dη f) = ∫ dη (∫ dθ f)
+    **Note**: Despite its name, this is NOT Fubini's theorem. It is just the
+    definitional unfolding of `berezinIntegralOdd` applied to a function on
+    ℝ^{p+r|q+s}. A genuine Fubini theorem would require:
+    1. A function on the product ℝ^{p|q} × ℝ^{r|s} (not ℝ^{p+r|q+s})
+    2. Two separate Berezin integrals ∫dθ and ∫dη
+    3. A proof that (∫dθ)(∫dη f) = (∫dη)(∫dθ f) = ∫d(θ,η) f
 
-    This is because the Berezin integral simply extracts the top component
-    in each set of odd variables, and these operations commute.
-
-    **Mathematical content:**
-    For f with expansion f = Σ_{I,J} f_{I,J}(x,y) θ^I η^J where:
-    - I ⊆ {1,...,q} indexes θ-monomials
-    - J ⊆ {1,...,s} indexes η-monomials
-
-    The full Berezin integral extracts f_{univ_q, univ_s}(x,y).
-
-    This can be computed either as:
-    - (∫ dθ)(∫ dη f) = (∫ dθ) f_{*,univ_s} = f_{univ_q, univ_s}, or
-    - (∫ dη)(∫ dθ f) = (∫ dη) f_{univ_q,*} = f_{univ_q, univ_s}
-
-    **Key insight:** The Berezin integral is a linear functional that extracts
-    coefficients. For coefficients indexed by disjoint sets of Grassmann variables,
-    the extraction operations commute. -/
+    The actual commutativity of Berezin integrals over disjoint sets of
+    Grassmann variables is a theorem that requires infrastructure for
+    partial Berezin integration (not yet formalized). -/
+-- MISLEADING NAME: This is just `rfl`, not a Fubini theorem.
+-- See docstring for what a genuine Fubini theorem would require.
 theorem berezin_fubini {p q r s : ℕ}
     (f : SuperDomainFunction (p + r) (q + s)) :
     -- The Berezin integral over all (q+s) odd variables extracts the top coefficient
@@ -1250,34 +1307,23 @@ noncomputable def superDivergence {p q : ℕ} (X : SuperVectorField p q Parity.e
     ⟨fun I => Finset.univ.sum fun a => (partialOdd a (X.oddComponents a)).coefficients I⟩
   SuperDomainFunction.add evenContribution oddContribution
 
-/-- The divergence theorem for supermanifolds.
+/-- The divergence theorem for supermanifolds (PLACEHOLDER — TAUTOLOGICAL).
 
-    For a compact supermanifold M with boundary ∂M and an even vector field X:
-      ∫_M div(X) [Dx Dθ] = ∫_{∂M} ι_X [Dx Dθ]
+    **WARNING**: This is currently a tautology (proves `x = x` via `rfl`).
+    The conclusion equals the hypothesis because the boundary integral is not
+    properly formulated. The statement should relate ∫_U div(X) to ∫_{∂U} ι_X,
+    but the boundary integral infrastructure is not yet developed.
 
-    This is the analog of the classical divergence theorem.
-
-    **Proof outline:**
-    1. Split div(X) into even and odd contributions
-    2. For the odd contributions: ∫ dθ (∂Xᵃ/∂θᵃ) = 0 by integration by parts
-       (since ∂/∂θᵃ lowers θ-degree, there's no top component)
-    3. For the even contributions: apply classical divergence theorem on the body
-    4. The boundary term comes from the even part via classical Stokes -/
+    For the actual content, see `Integration/StokesTheorem.lean` which properly
+    reduces super Stokes to the classical divergence theorem on the body. -/
 theorem super_divergence_theorem {p q : ℕ}
     (X : SuperVectorField p q Parity.even)
     (_U : Set (Fin p → ℝ))    -- Region in the body
     (_bdryU : Set (Fin (p - 1) → ℝ))  -- Boundary
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
     (_boundaryIntegral : SmoothFunction (p - 1) → Set (Fin (p - 1) → ℝ) → ℝ) :
-    -- The odd part of divergence integrates to zero (by integration by parts)
-    -- So ∫ div(X) = ∫ (even part of div(X))
-    -- For the even part, use classical divergence theorem
     bodyIntegral (berezinIntegralOdd (superDivergence X)) _U =
     bodyIntegral (berezinIntegralOdd (superDivergence X)) _U := by
-  -- This tautology indicates we need:
-  -- 1. Proper formulation of boundary integral
-  -- 2. Show odd derivative contributions vanish
-  -- 3. Apply classical divergence theorem
   rfl
 
 end Supermanifolds

@@ -129,3 +129,77 @@ See Deligne-Morgan "Notes on Supersymmetry" for rigorous treatment of supermatri
 - `FPSLogExp.logOneSubNilpotent` uses `algebraMap ℚ R (1/(k+1)) * x^(k+1)` — correct rational coefficients
 - Both work over `CommRing R` with `Algebra ℚ R`, applicable to even Grassmann subalgebra
 - For the full Grassmann algebra (not commutative), these results apply to even elements only
+
+## Partition of Unity: Witten Construction
+
+### The key insight
+
+A partition of unity on a supermanifold cannot be obtained by simply lifting
+body PU functions. In chart α, `liftToSuper(ρ̃_α)` is θ-independent. But
+when expressed in chart β via the transition T_{αβ}, the even coordinate map
+`x_α = x_α(x_β, θ_β)` introduces θ_β-dependence via Taylor expansion.
+
+Therefore the raw sum `S = Σ_α (lift ρ̃_α ∘ T_{αβ})` in chart β is NOT 1.
+Its body is 1 (because the body transition reduces to the body PU sum), but
+it picks up nilpotent even corrections: `S = 1 + ε` where `ε` is nilpotent.
+
+### The construction (Witten §3.1)
+
+Since S = 1 + ε with ε nilpotent, S is invertible:
+  S⁻¹ = 1 - ε + ε² - ... (terminates by nilpotency of ε)
+
+Define ρ_α := (lift ρ̃_α ∘ T_{αβ}) · S⁻¹. Then:
+  Σ_α ρ_α = S · S⁻¹ = 1
+
+This is an EXACT identity in the Grassmann algebra, not approximate.
+
+### Formalization status
+
+The algebraic core is fully proven:
+- `rawSumAt` computes S
+- `rawSumAt_body_eq_one` proves body(S) = 1
+- `rawSumInverseAt` computes S⁻¹ via `grassmannGeomInverse`
+- `rawSumAt_mul_inverse` proves S · S⁻¹ = 1
+- `normalizedPartitionAt` computes ρ_α = (lift ∘ T) · S⁻¹
+- `normalizedPartition_sum_one` proves Σ ρ_α = 1
+
+### Design issue with SuperPartitionOfUnity
+
+The `super_sum_eq_one` field currently evaluates each function in its own chart.
+This is too weak for the double-sum trick, which needs all functions expressed
+in a SINGLE chart. Must reformulate to use `composeEvalAt`.
+
+## Integral Forms vs Densities
+
+Integral forms are sections of the Berezinian line bundle. Under coordinate
+change, they transform by the SIGNED Berezinian (not |Ber|). This is different
+from measure-theoretic densities which use |det|.
+
+Consequence: `compatible_body` and `SatisfiesChangeOfVar` use signed det,
+not |det|. This was fixed in the audit (Round 5).
+
+For oriented supermanifolds, transitions preserve orientation, so
+det(body Jacobian) > 0 and the sign doesn't matter in practice.
+
+## Berezinian Body-Level Cancellation
+
+In the Berezin integral of a pullback, the det(D) from the odd substitution
+θ' = Dθ + ... (which gives a factor 1/det(D) in the Berezin measure) cancels
+with det(D) in the denominator of the Berezinian Ber = det(A-BD⁻¹C)/det(D).
+
+Net result at body level: only det(A_body) = det(body Jacobian) remains.
+
+This is why `compatible_body` has `(det bodyJac)⁻¹` and not the full Berezinian.
+
+## Product Rule for partialEven
+
+The Leibniz rule for `partialEven i` on products of super functions:
+
+  ∂(f·g)/∂xⁱ = (∂f/∂xⁱ)·g + f·(∂g/∂xⁱ)
+
+is NOT trivial to prove in Lean because `SuperDomainFunction.mul` involves
+the Grassmann product formula with reorder signs. The proof must:
+1. Apply fderiv_mul to each coefficient term in the Grassmann product
+2. Regroup the resulting sum into two copies of the Grassmann product
+
+This is the key technical lemma needed for the Leibniz rule for d₀.
