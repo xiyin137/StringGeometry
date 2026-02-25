@@ -23,13 +23,13 @@ infrastructure formalized. Global assembly still has open proof obligations.
 - Berezinian cocycle from chain rule
 - `partialEven_mul`: product rule for ∂/∂xⁱ on Grassmann products
 
-**Current folder total**: 28 `sorry` occurrences (allowlisted and tracked).
+**Current folder total**: 27 `sorry` occurrences (allowlisted and tracked).
 
 **What is NOT proven** (honest sorrys):
 - Global Berezin integral independent of PU choice
 - Global Stokes theorem
 - Super PU exists from body PU + Mathlib paracompactness
-- Berezin change of variables (super pullback → body-level CoV)
+- Body-level pullback identity needed by CoV bridge (`hPullbackBody`)
 
 **Recently completed**:
 - Leibniz rule for d₀ on products: `d0Codim1_mulByFunction`
@@ -67,7 +67,7 @@ infrastructure formalized. Global assembly still has open proof obligations.
 |------|--------|-------|
 | Helpers/FiniteGrassmann.lean | 3 | Legacy approximate composition (`composeLegacyApprox`) and downstream placeholder theorem |
 | Helpers/SuperChainRule.lean | 5 | Legacy full-cocycle-to-chain-rule bridge has pending proofs |
-| Integration/GlobalStokes.lean | 3 | `berezin_change_of_variables`, `globalBerezinIntegral_independent_proper`, `global_super_stokes_no_boundary` |
+| Integration/GlobalStokes.lean | 2 | `globalBerezinIntegral_independent_proper`, `global_super_stokes_no_boundary` |
 | BerezinIntegration.lean | 4 | `pullbackLegacy`, `berezin_change_of_variables_formula_legacy`, `partition_of_unity_exists`, `globalBerezinIntegral_independent` |
 | Helpers/FormalPowerSeries.lean | 1 | Jacobi identity bridge step remains sorry |
 | FPS/LogExp.lean | 1 | Inverse identity bridge step remains sorry |
@@ -94,12 +94,12 @@ infrastructure formalized. Global assembly still has open proof obligations.
 `Integration/ExteriorDerivative.lean`.
 **Use**: This is the key algebraic decomposition step for the global Stokes proof.
 
-### Priority 2: Prove `berezin_change_of_variables` (GlobalStokes.lean)
-**What**: Show `∫_U φ*(ω) = ∫_V ω` using the corrected `SatisfiesChangeOfVar`.
-**Requires**: Body-level reduction lemma.
-**How**:
-1. Show pullbackProper extracts to `(f ∘ φ_body) · det(J_body)` at top θ-component
-2. Apply `hChangeOfVar.change_of_var` with Φ = φ.bodyMap
+### Priority 2: Prove Body-Level Pullback Identity (`hPullbackBody`)
+**Status**: `berezin_change_of_variables` is now proven in `GlobalStokes.lean`
+using an explicit bridge hypothesis `hPullbackBody`.
+**What remains**: Discharge that hypothesis from Pullback/Berezinian infrastructure:
+`berezinIntegralOdd (pullbackProper φ ω).coefficient =
+  (berezinIntegralOdd ω.coefficient) ∘ φ.bodyMap · det(Dφ.bodyMap)`.
 
 ### Priority 3: Prove `globalBerezinIntegral_independent_proper` (GlobalStokes.lean)
 **What**: Independence of partition of unity choice.
@@ -140,8 +140,9 @@ hDivThm (classical divergence theorem hypothesis)
 Global change-of-variables layer
 --------------------------------
 pullbackEvalAt + berezinianCarrierAt + BodyIntegral.SatisfiesChangeOfVar
-  └─> berezin_change_of_variables (TODO, GlobalStokes.lean)
-        └─> globalBerezinIntegral_independent_proper (TODO, GlobalStokes.lean)
+  └─> hPullbackBody bridge lemma (TODO)
+        └─> berezin_change_of_variables (DONE, via bridge hypothesis)
+              └─> globalBerezinIntegral_independent_proper (TODO, GlobalStokes.lean)
 
 Global partition layer
 ----------------------

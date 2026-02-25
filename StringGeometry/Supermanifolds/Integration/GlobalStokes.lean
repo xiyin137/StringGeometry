@@ -129,15 +129,32 @@ theorem berezin_change_of_variables {p q : ℕ}
       (finiteGrassmannAlgebra q).odd)
     (hDiffeo : φ.IsDiffeoOn U V)
     (ω : IntegralForm p q)
+    -- Body-level bridge: top component of pullback equals
+    -- (top component of ω ∘ φ.bodyMap) · det(Dφ.bodyMap).
+    (hPullbackBody : ∀ x,
+      berezinIntegralOdd (IntegralForm.pullbackProper φ ω hD hBD).coefficient x =
+      (berezinIntegralOdd ω.coefficient).toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
     (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar p bodyIntegral) :
     localBerezinIntegral U (IntegralForm.pullbackProper φ ω hD hBD) bodyIntegral =
     localBerezinIntegral V ω bodyIntegral := by
-  -- Proof requires:
-  -- 1. Show that pullbackProper extracts to (f ∘ φ_body) · |det J_body| at top θ-component
-  -- 2. Apply hChangeOfVar.change_of_var with Φ = φ.bodyMap
-  -- 3. Match the pointwise equality condition hfΦJ using Berezinian body-level identity
-  sorry
+  unfold localBerezinIntegral
+  let fTop : SmoothFunction p := berezinIntegralOdd ω.coefficient
+  let fTopPull : SmoothFunction p :=
+    berezinIntegralOdd (IntegralForm.pullbackProper φ ω hD hBD).coefficient
+  have hfTopPull :
+      ∀ x, fTopPull.toFun x = fTop.toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det := by
+    intro x
+    change berezinIntegralOdd (IntegralForm.pullbackProper φ ω hD hBD).coefficient x =
+      (berezinIntegralOdd ω.coefficient).toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det
+    simpa using hPullbackBody x
+  have hCov :=
+    hChangeOfVar.change_of_var U V φ.bodyMap hDiffeo.smooth_body hDiffeo.bij
+      fTop fTopPull hfTopPull
+  simpa [fTop, fTopPull] using hCov.symm
 
 /-! ## Independence of Partition of Unity
 
