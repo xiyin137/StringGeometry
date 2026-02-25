@@ -15,7 +15,11 @@ echo "[1/3] Checking for non-allowlisted sorrys in StringGeometry/Supermanifolds
 TMP_FILE="$(mktemp)"
 trap 'rm -f "$TMP_FILE"' EXIT
 
-rg -n '\bsorry\b' StringGeometry/Supermanifolds --glob '*.lean' > "$TMP_FILE" || true
+if command -v rg >/dev/null 2>&1; then
+  rg -n '\bsorry\b' StringGeometry/Supermanifolds --glob '*.lean' > "$TMP_FILE" || true
+else
+  grep -R -n -w --include='*.lean' 'sorry' StringGeometry/Supermanifolds > "$TMP_FILE" || true
+fi
 
 DISALLOWED=""
 while IFS= read -r line; do
