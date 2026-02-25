@@ -95,9 +95,13 @@ infrastructure formalized. Global assembly still has open proof obligations.
 **Use**: This is the key algebraic decomposition step for the global Stokes proof.
 
 ### Priority 2: Prove Body-Level Pullback Identity (`hPullbackBody`)
-**Status**: `berezin_change_of_variables` is now proven in `GlobalStokes.lean`
-using an explicit bridge hypothesis `hPullbackBody`.
-**What remains**: Discharge that hypothesis from Pullback/Berezinian infrastructure:
+**Status**:
+- `berezin_change_of_variables` is proved from bridge hypothesis `hPullbackBody`.
+- `pullback_berezinOdd_expand` (Pullback.lean) now gives the explicit finite Grassmann
+  sum formula for the pullback top component.
+- `berezin_change_of_variables_from_pullback_expansion` (GlobalStokes.lean) is added;
+  it reduces CoV to this explicit expansion bridge.
+**What remains**: Discharge the explicit finite-sum bridge from Pullback/Berezinian infrastructure:
 `berezinIntegralOdd (pullbackProper φ ω).coefficient =
   (berezinIntegralOdd ω.coefficient) ∘ φ.bodyMap · det(Dφ.bodyMap)`.
 
@@ -137,9 +141,11 @@ hDivThm (classical divergence theorem hypothesis)
 Global change-of-variables layer
 --------------------------------
 pullbackEvalAt + berezinianCarrierAt + BodyIntegral.SatisfiesChangeOfVar
-  └─> hPullbackBody bridge lemma (TODO)
-        └─> berezin_change_of_variables (DONE, via bridge hypothesis)
-              └─> globalBerezinIntegral_independent_proper (DONE via bridge hypotheses; TODO to derive bridges)
+  └─> pullback_berezinOdd_expand (DONE: explicit top-component finite-sum formula)
+        └─> explicit pullback-top reduction to body determinant (TODO)
+              ├─> berezin_change_of_variables_from_pullback_expansion (DONE, via explicit bridge)
+              └─> berezin_change_of_variables (DONE, via hPullbackBody bridge)
+                    └─> globalBerezinIntegral_independent_proper (DONE via bridge hypotheses; TODO to derive bridges)
 
 Global partition layer
 ----------------------

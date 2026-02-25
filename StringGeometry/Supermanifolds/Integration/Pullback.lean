@@ -250,4 +250,29 @@ theorem pullback_berezinOdd {p q : ℕ}
   unfold berezinIntegralOdd
   rfl
 
+/-- Explicit finite-sum expansion of the pullback top coefficient.
+
+    This rewrites the top Berezin component as the convolution formula for
+    Grassmann multiplication at `Finset.univ`. It is the concrete target used
+    to discharge the body-level CoV bridge in `GlobalStokes.lean`. -/
+theorem pullback_berezinOdd_expand {p q : ℕ}
+    (φ : SuperCoordChange p q) (ω : IntegralForm p q)
+    (hD : ∀ x, (finiteGrassmannAlgebra q).IsInvertible
+      (φ.jacobian.toSuperMatrixAt x).D_lifted.det)
+    (hBD : ∀ x i j, ((φ.jacobian.toSuperMatrixAt x).Bblock *
+      (φ.jacobian.toSuperMatrixAt x).D_inv_carrier) i j ∈
+      (finiteGrassmannAlgebra q).odd)
+    (x : Fin p → ℝ) :
+    berezinIntegralOdd (IntegralForm.pullbackProper φ ω hD hBD).coefficient x =
+    Finset.univ.sum (fun I =>
+      Finset.univ.sum (fun J =>
+        if I ∪ J = (Finset.univ : Finset (Fin q)) ∧ I ∩ J = ∅ then
+          (FiniteGrassmannCarrier.reorderSign I J : ℝ) *
+            composeEvalAt ω.coefficient φ x I *
+            berezinianCarrierAt φ x (hD x) (hBD x) J
+        else 0)) := by
+  rw [pullback_berezinOdd]
+  unfold pullbackEvalAt
+  simp [FiniteGrassmannCarrier.mul_apply]
+
 end Supermanifolds

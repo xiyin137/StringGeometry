@@ -156,6 +156,43 @@ theorem berezin_change_of_variables {p q : ℕ}
       fTop fTopPull hfTopPull
   simpa [fTop, fTopPull] using hCov.symm
 
+/-- Change of variables with an explicit finite-sum pullback-top bridge.
+
+    This variant factors the hard CoV bridge through the concrete expansion from
+    `pullback_berezinOdd_expand`, reducing the remaining obligation to a single
+    finite Grassmann coefficient identity. -/
+theorem berezin_change_of_variables_from_pullback_expansion {p q : ℕ}
+    (U V : Set (Fin p → ℝ))
+    (φ : SuperCoordChange p q)
+    (hD : ∀ x, (finiteGrassmannAlgebra q).IsInvertible
+      (φ.jacobian.toSuperMatrixAt x).D_lifted.det)
+    (hBD : ∀ x i j, ((φ.jacobian.toSuperMatrixAt x).Bblock *
+      (φ.jacobian.toSuperMatrixAt x).D_inv_carrier) i j ∈
+      (finiteGrassmannAlgebra q).odd)
+    (hDiffeo : φ.IsDiffeoOn U V)
+    (ω : IntegralForm p q)
+    -- Explicit pullback top expansion reduced to body-map Jacobian formula.
+    (hPullbackTopExpand : ∀ x,
+      @Finset.sum (Finset (Fin q)) ℝ _ (Finset.univ : Finset (Finset (Fin q)))
+        (fun I =>
+          @Finset.sum (Finset (Fin q)) ℝ _ (Finset.univ : Finset (Finset (Fin q)))
+            (fun J =>
+              if I ∪ J = (Finset.univ : Finset (Fin q)) ∧ I ∩ J = ∅ then
+                (FiniteGrassmannCarrier.reorderSign I J : ℝ) *
+                  composeEvalAt ω.coefficient φ x I *
+                  berezinianCarrierAt φ x (hD x) (hBD x) J
+              else 0)) =
+      (berezinIntegralOdd ω.coefficient).toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det)
+    (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar p bodyIntegral) :
+    localBerezinIntegral U (IntegralForm.pullbackProper φ ω hD hBD) bodyIntegral =
+    localBerezinIntegral V ω bodyIntegral := by
+  refine berezin_change_of_variables U V φ hD hBD hDiffeo ω ?_ bodyIntegral hChangeOfVar
+  intro x
+  rw [pullback_berezinOdd_expand (φ := φ) (ω := ω) (hD := hD) (hBD := hBD) (x := x)]
+  exact hPullbackTopExpand x
+
 /-! ## Independence of Partition of Unity
 
 The global integral is independent of the choice of partition of unity.
