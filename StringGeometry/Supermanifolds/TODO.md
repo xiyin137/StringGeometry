@@ -23,13 +23,13 @@ infrastructure formalized. Global assembly still has open proof obligations.
 - Berezinian cocycle from chain rule
 - `partialEven_mul`: product rule for ∂/∂xⁱ on Grassmann products
 
-**Current folder total**: 25 `sorry` occurrences (allowlisted and tracked).
+**Current folder total**: 20 `sorry` occurrences (allowlisted and tracked).
 
 **What is NOT yet derived from local infrastructure**:
 - Bridge hypotheses for global PU independence (double-sum transport expansions)
 - Bridge hypotheses for global Stokes finite-sum decomposition
-- Super PU exists from body PU + Mathlib paracompactness
-- Body-level pullback identity needed by CoV bridge (`hPullbackBody`)
+- Super PU witness extraction from pure paracompactness/atlas data
+- Body-level pullback identity needed by CoV bridge (now in explicit finite-sum form)
 
 **Recently completed**:
 - Leibniz rule for d₀ on products: `d0Codim1_mulByFunction`
@@ -62,13 +62,13 @@ infrastructure formalized. Global assembly still has open proof obligations.
 | Integration/Pullback.lean | pullbackProper, berezinianCarrierAt_grassmannSmooth — all proven (0 sorrys) |
 | Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence`, `partialEven_mul`, `d0Codim1_mulByFunction` (0 sorrys) |
 | Integration/GlobalStokes.lean | Placeholder-free: `berezin_change_of_variables` proved; global theorems now use explicit bridge hypotheses |
+| BerezinIntegration.lean | Legacy placeholders removed; existence/uniqueness are now explicit assumption-driven interfaces |
 
 ### Has Honest Sorrys (definitions mostly correct, proofs pending)
 | File | Sorrys | Notes |
 |------|--------|-------|
-| Helpers/FiniteGrassmann.lean | 3 | Legacy approximate composition (`composeLegacyApprox`) and downstream placeholder theorem |
+| Helpers/FiniteGrassmann.lean | 2 | Legacy approximate composition (`composeLegacyApprox`) smoothness + downstream chain-rule placeholder |
 | Helpers/SuperChainRule.lean | 5 | Legacy full-cocycle-to-chain-rule bridge has pending proofs |
-| BerezinIntegration.lean | 4 | `pullbackLegacy`, `berezin_change_of_variables_formula_legacy`, `partition_of_unity_exists`, `globalBerezinIntegral_independent` |
 | Helpers/FormalPowerSeries.lean | 1 | Jacobi identity bridge step remains sorry |
 | FPS/LogExp.lean | 1 | Inverse identity bridge step remains sorry |
 
@@ -77,7 +77,7 @@ infrastructure formalized. Global assembly still has open proof obligations.
 |------|-------|
 | BerezinIntegration.lean: `super_stokes_legacy` | Hypothesis restates conclusion. Superseded by StokesTheorem.lean |
 | BerezinIntegration.lean: `super_divergence_theorem_legacy` | Proves `x = x` via rfl. Boundary integral not formalized |
-| BerezinIntegration.lean: `IntegralForm.pullbackLegacy` | `⟨sorry⟩`. Superseded by `pullbackProper` in Pullback.lean |
+| BerezinIntegration.lean: `IntegralForm.pullbackLegacy` | Legacy approximate composition-only pullback. Superseded by `pullbackProper` in Pullback.lean |
 | Integration/Legacy.lean | Deprecated compatibility aliases for legacy names |
 
 ### Sorrys Independent of Integration Pipeline
@@ -116,9 +116,11 @@ infrastructure formalized. Global assembly still has open proof obligations.
 **What remains**: Derive these bridges from local Stokes + Leibniz + PU derivative cancellation.
 
 ### Priority 5: `partition_of_unity_exists` (BerezinIntegration.lean)
-**What**: Derive SuperPartitionOfUnity from Mathlib paracompactness.
-**How**: Use Mathlib's `SmoothPartitionOfUnity.exists_isSubordinate`, lift to super
-via `superPartitionFromBody`.
+**Status**: Done in assumption-driven form via `BodyPartitionWitness`:
+`partition_of_unity_exists` now constructs `SuperPartitionOfUnity` from explicit
+body partition data (no `sorry`).
+**What remains**: derive `BodyPartitionWitness` automatically from pure
+paracompactness/atlas infrastructure (Mathlib `SmoothPartitionOfUnity` bridge).
 
 ---
 

@@ -23,11 +23,15 @@ theorem berezin_change_of_variables_formula {p q : ℕ}
     (φ : SuperCoordChange p q)
     (hDiffeo : φ.IsDiffeoOn U V)
     (ω : IntegralForm p q)
+    (hPullbackBody : ∀ x,
+      berezinIntegralOdd (IntegralForm.pullback φ ω).coefficient x =
+      (berezinIntegralOdd ω.coefficient).toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
     (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar p bodyIntegral) :
     localBerezinIntegral U (IntegralForm.pullback φ ω) bodyIntegral =
     localBerezinIntegral V ω bodyIntegral :=
-  berezin_change_of_variables_formula_legacy U V φ hDiffeo ω bodyIntegral hChangeOfVar
+  berezin_change_of_variables_formula_legacy U V φ hDiffeo ω hPullbackBody bodyIntegral hChangeOfVar
 
 theorem super_stokes {p q : ℕ} (_hp : 0 < p)
     (U : Set (Fin p → ℝ))

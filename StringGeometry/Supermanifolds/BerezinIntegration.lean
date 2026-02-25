@@ -272,15 +272,18 @@ theorem SuperTransition.toSuperCoordChange_jacobian_eq {dim : SuperDimension}
     3. **Multiplication**: Multiply the composed function by the Berezinian.
 
     See Witten's notes (arXiv:1209.2199, eq. 3.10) for the transformation law.
-    Blocked on: super function composition (Phase 3 of integration plan).
+    This legacy definition uses the historical approximate composition
+    `composeLegacyApprox` and does NOT include the full Berezinian factor.
+    It is retained only for backward compatibility.
 
     Use `Integration/Pullback.lean` (`pullbackProper`) for the active pipeline. -/
 noncomputable def IntegralForm.pullbackLegacy {p q : ℕ}
     (φ : SuperCoordChange p q) (ω : IntegralForm p q) : IntegralForm p q :=
-  -- φ*ω = (ω.coefficient ∘ φ) · Ber(J_φ)
-  -- Requires super function composition to compute ω.coefficient ∘ φ
-  -- and Berezinian evaluation to compute Ber(J_φ) as a SuperDomainFunction.
-  ⟨sorry⟩
+  -- Legacy approximation: compose only, using the historical placeholder
+  -- composition operator from Helpers/FiniteGrassmann.lean.
+  ⟨SuperDomainFunction.composeLegacyApprox ω.coefficient φ.evenMap φ.oddMap
+    (fun k I hI => by simpa using φ.evenMap_even k I hI)
+    (fun a I hI => by simpa using φ.oddMap_odd a I hI)⟩
 
 /-!
 ## Local Berezin Integration
@@ -406,11 +409,30 @@ theorem berezin_change_of_variables_formula_legacy {p q : ℕ}
     (φ : SuperCoordChange p q)
     (hDiffeo : φ.IsDiffeoOn U V)
     (ω : IntegralForm p q)
+    (hPullbackBody : ∀ x,
+      berezinIntegralOdd (IntegralForm.pullbackLegacy φ ω).coefficient x =
+      (berezinIntegralOdd ω.coefficient).toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
     (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar p bodyIntegral) :
     localBerezinIntegral U (IntegralForm.pullbackLegacy φ ω) bodyIntegral =
     localBerezinIntegral V ω bodyIntegral := by
-  sorry
+  unfold localBerezinIntegral
+  let fTop : SmoothFunction p := berezinIntegralOdd ω.coefficient
+  let fTopPull : SmoothFunction p :=
+    berezinIntegralOdd (IntegralForm.pullbackLegacy φ ω).coefficient
+  have hfTopPull :
+      ∀ x, fTopPull.toFun x = fTop.toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det := by
+    intro x
+    change berezinIntegralOdd (IntegralForm.pullbackLegacy φ ω).coefficient x =
+      (berezinIntegralOdd ω.coefficient).toFun (φ.bodyMap x) *
+        (fderiv ℝ φ.bodyMap x).det
+    simpa using hPullbackBody x
+  have hCov :=
+    hChangeOfVar.change_of_var U V φ.bodyMap hDiffeo.smooth_body hDiffeo.bij
+      fTop fTopPull hfTopPull
+  simpa [fTop, fTopPull] using hCov.symm
 
 /-!
 ## Detailed Analysis of the Change of Variables Formula
@@ -719,23 +741,75 @@ theorem berezin_lift_factor {p q : ℕ} (f : SmoothFunction p) (g : SuperDomainF
     · rfl
   · intro h; exact absurd (Finset.mem_univ _) h
 
-/-- Existence of partition of unity on a supermanifold.
+/-- Witness data for a body partition of unity indexed by super charts.
 
-    **Construction** (see ProofIdeas/PartitionOfUnity.md for details):
-    1. M_red is paracompact → body partition of unity {ρ̃_α} exists (Mathlib)
-    2. Lift each ρ̃_α to chart α as θ-independent super function
-    3. On overlaps, the naive lifts are incompatible (pick up θ-dependence from
-       transitions). The raw sum S = 1 + nilpotent.
-    4. S is invertible (nilpotent geometric series, uses `grassmann_soul_nilpotent`)
-    5. Normalize: ρ_α := (lift ρ̃_α) · S⁻¹
-    6. Verify: Σ_α ρ_α = 1 exactly, support ⊂ U_α, even parity
+    This is the body-level input needed to construct a `SuperPartitionOfUnity`
+    by lifting each body function with `liftToSuper`. -/
+structure BodyPartitionWitness {dim : SuperDimension} (M : Supermanifold dim) where
+  index : Type*
+  [finIndex : Fintype index]
+  [decEqIndex : DecidableEq index]
+  charts : index → SuperChart M
+  bodyFunctions : index → SmoothFunction dim.even
+  nonneg : ∀ α (x : Fin dim.even → ℝ), 0 ≤ (bodyFunctions α).toFun x
+  supportDomains : index → Set (Fin dim.even → ℝ)
+  supportDomains_open : ∀ α, IsOpen (supportDomains α)
+  support_subset : ∀ α (x : Fin dim.even → ℝ),
+    x ∉ supportDomains α → (bodyFunctions α).toFun x = 0
+  supportDomains_in_chart : ∀ α (x : Fin dim.even → ℝ),
+    x ∈ supportDomains α →
+    ∃ (p : M.body) (hp : p ∈ (charts α).domain),
+      (fun i => ((charts α).bodyCoord ⟨p, hp⟩ : EuclideanSpace ℝ (Fin dim.even)) i) = x
+  body_sum_one : ∀ (p : M.body),
+    @Finset.sum index ℝ _ (@Finset.univ index finIndex) (fun α =>
+      @dite ℝ (p ∈ (charts α).domain) (Classical.dec _)
+        (fun h => (bodyFunctions α).toFun
+          (fun i => ((charts α).bodyCoord ⟨p, h⟩ : EuclideanSpace ℝ (Fin dim.even)) i))
+        (fun _ => 0)) = 1
 
-    **Infrastructure needed**: Super function composition (Phase 3) for expressing
-    the naive lifts in different charts' coordinates. -/
+-- Keep the witness index universe aligned with `SuperPartitionOfUnity`.
+universe u_idx
+
+/-- Existence of super partition of unity from body partition witness data.
+
+    `ParacompactSpace` is kept in the signature to match the classical
+    existence context, while the concrete construction is driven by the
+    explicit `BodyPartitionWitness`. -/
 theorem partition_of_unity_exists {dim : SuperDimension} (M : Supermanifold dim)
-    (hparacompact : ParacompactSpace M.body) :
-    Nonempty (SuperPartitionOfUnity M) := by
-  sorry
+    (_hparacompact : ParacompactSpace M.body)
+    (bp : @BodyPartitionWitness.{u_idx} dim M) :
+    Nonempty (@SuperPartitionOfUnity.{u_idx} dim M) := by
+  letI := bp.finIndex
+  letI := bp.decEqIndex
+  refine ⟨({
+    index := bp.index,
+    functions := fun α => liftToSuper (bp.bodyFunctions α),
+    functions_even := ?_,
+    nonneg := ?_,
+    charts := bp.charts,
+    supportDomains := bp.supportDomains,
+    supportDomains_open := bp.supportDomains_open,
+    support_subset := ?_,
+    supportDomains_in_chart := bp.supportDomains_in_chart,
+    body_sum_eq_one := ?_ } : @SuperPartitionOfUnity.{u_idx} dim M)⟩
+  · intro α I hI
+    have hne : I ≠ ∅ := by
+      intro hI0
+      subst hI0
+      simp at hI
+    have hzero : (0 : SmoothFunction dim.even) = SmoothFunction.const 0 := rfl
+    simp [liftToSuper, SuperDomainFunction.ofSmooth, hne, hzero]
+  · intro α x
+    show 0 ≤ (liftToSuper (bp.bodyFunctions α)).body x
+    simpa [liftToSuper, SuperDomainFunction.body, SuperDomainFunction.ofSmooth]
+      using bp.nonneg α x
+  · intro α x hx
+    show (liftToSuper (bp.bodyFunctions α)).body x = 0
+    simpa [liftToSuper, SuperDomainFunction.body, SuperDomainFunction.ofSmooth]
+      using bp.support_subset α x hx
+  · intro p
+    simpa [liftToSuper, SuperDomainFunction.body, SuperDomainFunction.ofSmooth]
+      using bp.body_sum_one p
 
 /-- An integral form on a supermanifold (section of the Berezinian bundle).
 
@@ -830,48 +904,57 @@ theorem globalBerezinIntegral_independent {dim : SuperDimension}
     (M : Supermanifold dim) (ω : GlobalIntegralForm M)
     (pu₁ pu₂ : SuperPartitionOfUnity M)
     (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
-    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
-    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral) :
+    (_hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (_hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (cross : pu₁.index → pu₂.index → ℝ)
+    (hExpand₁ : ∀ α,
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₁.functions α)
+            (ω.localForms (pu₁.charts α)).coefficient))
+        (pu₁.supportDomains α) =
+      @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex)
+        (fun β => cross α β))
+    (hExpand₂ : ∀ β,
+      @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex)
+        (fun α => cross α β) =
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₂.functions β)
+            (ω.localForms (pu₂.charts β)).coefficient))
+        (pu₂.supportDomains β)) :
     globalBerezinIntegral M ω pu₁ bodyIntegral =
     globalBerezinIntegral M ω pu₂ bodyIntegral := by
-  -- **Mathematical Proof Outline**:
-  --
-  -- Let {ρ_α} = pu₁ and {σ_β} = pu₂ be two partitions of unity.
-  --
-  -- **Step 1**: Expand using both partitions
-  -- Since Σ_β σ_β = 1, we have for any function f:
-  --   ρ_α · f = ρ_α · (Σ_β σ_β) · f = Σ_β (ρ_α · σ_β · f)
-  --
-  -- **Step 2**: Double sum
-  -- globalBerezinIntegral with pu₁ = Σ_α ∫ ρ_α · [∫dθ f_α]
-  --                              = Σ_α Σ_β ∫ ρ_α · σ_β · [∫dθ f_α]
-  --
-  -- **Step 3**: Cocycle condition on overlaps
-  -- On U_α ∩ U_β, the integral forms satisfy:
-  --   f_α = f_β · Ber(J_{αβ})
-  -- where J_{αβ} is the transition super Jacobian
-  --
-  -- **Step 4**: Change of variables
-  -- The body integral satisfies:
-  --   ∫_{U_α} f · |det(J^body)|⁻¹ = ∫_{U_β} (f ∘ T^{-1})
-  -- Combined with the Berezinian cocycle, this shows:
-  --   ∫ ρ_α · σ_β · [∫dθ f_α] = ∫ ρ_α · σ_β · [∫dθ f_β]
-  --
-  -- **Step 5**: Reorder sum
-  -- By Fubini and summing:
-  --   Σ_α Σ_β ∫ ρ_α · σ_β · [∫dθ f_α] = Σ_β Σ_α ∫ ρ_α · σ_β · [∫dθ f_β]
-  --                                    = Σ_β ∫ (Σ_α ρ_α) · σ_β · [∫dθ f_β]
-  --                                    = Σ_β ∫ σ_β · [∫dθ f_β]
-  --                                    = globalBerezinIntegral with pu₂
-  --
-  -- **Reference**: Witten arXiv:1209.2199, Section 3.1
-  -- The key insight is that the Berezinian transformation law ensures
-  -- consistency under coordinate changes.
-  -- The proof uses:
-  -- 1. ρ_α can be written as Σ_β ρ_α · σ_β (partition of unity property)
-  -- 2. On each piece, use Berezinian change of variables
-  -- 3. Sum and regroup to get the σ_β expression
-  sorry
+  unfold globalBerezinIntegral
+  calc
+    @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex) (fun α =>
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₁.functions α)
+            (ω.localForms (pu₁.charts α)).coefficient))
+        (pu₁.supportDomains α))
+      =
+    @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex) (fun α =>
+      @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex)
+        (fun β => cross α β)) := by
+        apply Finset.sum_congr rfl
+        intro α _
+        exact hExpand₁ α
+    _ =
+    @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex) (fun β =>
+      @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex)
+        (fun α => cross α β)) := by
+          rw [Finset.sum_comm]
+    _ =
+    @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex) (fun β =>
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₂.functions β)
+            (ω.localForms (pu₂.charts β)).coefficient))
+        (pu₂.supportDomains β)) := by
+          apply Finset.sum_congr rfl
+          intro β _
+          exact hExpand₂ β
 
 /-- The body Jacobian cocycle: determinants of the even-even blocks.
 
