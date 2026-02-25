@@ -770,28 +770,23 @@ structure BodyPartitionWitness {dim : SuperDimension} (M : Supermanifold dim) wh
 -- Keep the witness index universe aligned with `SuperPartitionOfUnity`.
 universe u_idx
 
-/-- Existence of super partition of unity from body partition witness data.
-
-    `ParacompactSpace` is kept in the signature to match the classical
-    existence context, while the concrete construction is driven by the
-    explicit `BodyPartitionWitness`. -/
-theorem partition_of_unity_exists {dim : SuperDimension} (M : Supermanifold dim)
-    (_hparacompact : ParacompactSpace M.body)
-    (bp : @BodyPartitionWitness.{u_idx} dim M) :
-    Nonempty (@SuperPartitionOfUnity.{u_idx} dim M) := by
+/-- Canonical super partition built by lifting a body partition witness. -/
+noncomputable def BodyPartitionWitness.toSuperPartition {dim : SuperDimension}
+    {M : Supermanifold dim} (bp : @BodyPartitionWitness.{u_idx} dim M) :
+    @SuperPartitionOfUnity.{u_idx} dim M := by
   letI := bp.finIndex
   letI := bp.decEqIndex
-  refine ⟨({
-    index := bp.index,
-    functions := fun α => liftToSuper (bp.bodyFunctions α),
-    functions_even := ?_,
-    nonneg := ?_,
-    charts := bp.charts,
-    supportDomains := bp.supportDomains,
-    supportDomains_open := bp.supportDomains_open,
-    support_subset := ?_,
-    supportDomains_in_chart := bp.supportDomains_in_chart,
-    body_sum_eq_one := ?_ } : @SuperPartitionOfUnity.{u_idx} dim M)⟩
+  refine
+    { index := bp.index
+      functions := fun α => liftToSuper (bp.bodyFunctions α)
+      functions_even := ?_
+      nonneg := ?_
+      charts := bp.charts
+      supportDomains := bp.supportDomains
+      supportDomains_open := bp.supportDomains_open
+      support_subset := ?_
+      supportDomains_in_chart := bp.supportDomains_in_chart
+      body_sum_eq_one := ?_ }
   · intro α I hI
     have hne : I ≠ ∅ := by
       intro hI0
@@ -810,6 +805,38 @@ theorem partition_of_unity_exists {dim : SuperDimension} (M : Supermanifold dim)
   · intro p
     simpa [liftToSuper, SuperDomainFunction.body, SuperDomainFunction.ofSmooth]
       using bp.body_sum_one p
+
+/-- The canonical lifted partition uses the witness body functions by definition. -/
+theorem BodyPartitionWitness.toSuperPartition_functions {dim : SuperDimension}
+    {M : Supermanifold dim} (bp : @BodyPartitionWitness.{u_idx} dim M) :
+    ∀ α, (bp.toSuperPartition.functions α) = liftToSuper (bp.bodyFunctions α) := by
+  intro α
+  rfl
+
+/-- The canonical lifted partition has full coefficient-level support vanishing:
+    outside support domains, all Grassmann coefficients vanish. -/
+theorem BodyPartitionWitness.toSuperPartition_support_full {dim : SuperDimension}
+    {M : Supermanifold dim} (bp : @BodyPartitionWitness.{u_idx} dim M) :
+    ∀ α I x, x ∉ bp.toSuperPartition.supportDomains α →
+      (bp.toSuperPartition.functions α).coefficients I x = 0 := by
+  intro α I x hx
+  by_cases hI : I = ∅
+  · subst hI
+    simpa [SuperDomainFunction.body]
+      using (bp.toSuperPartition.support_subset α x hx)
+  · simp [BodyPartitionWitness.toSuperPartition, liftToSuper,
+      SuperDomainFunction.ofSmooth, hI]
+
+/-- Existence of super partition of unity from body partition witness data.
+
+    `ParacompactSpace` is kept in the signature to match the classical
+    existence context, while the concrete construction is driven by the
+    explicit `BodyPartitionWitness`. -/
+theorem partition_of_unity_exists {dim : SuperDimension} (M : Supermanifold dim)
+    (_hparacompact : ParacompactSpace M.body)
+    (bp : @BodyPartitionWitness.{u_idx} dim M) :
+    Nonempty (@SuperPartitionOfUnity.{u_idx} dim M) := by
+  exact ⟨bp.toSuperPartition⟩
 
 /-- An integral form on a supermanifold (section of the Berezinian bundle).
 

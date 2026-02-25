@@ -66,7 +66,7 @@ infrastructure formalized. Global assembly still has open proof obligations.
 | Integration/Pullback.lean | pullbackProper, berezinianCarrierAt_grassmannSmooth — all proven (0 sorrys) |
 | Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence`, `partialEven_mul`, `d0Codim1_mulByFunction` (0 sorrys) |
 | Integration/GlobalStokes.lean | Placeholder-free; includes `global_super_stokes_no_boundary_more_reduced` with internally derived exact-term vanishing |
-| BerezinIntegration.lean | Legacy placeholders removed; existence/uniqueness are now explicit assumption-driven interfaces |
+| BerezinIntegration.lean | Legacy placeholders removed; canonical witness constructor `BodyPartitionWitness.toSuperPartition` added |
 
 ### Has Honest Sorrys (definitions mostly correct, proofs pending)
 | File | Sorrys | Notes |
@@ -125,14 +125,19 @@ infrastructure formalized. Global assembly still has open proof obligations.
   `hExactZero` internally.
 - Added `global_super_stokes_no_boundary_lift_partition`, which derives
   `hSupportFull` automatically from `hLift : ρ_α = liftToSuper(h_α)`.
+- Added `global_super_stokes_no_boundary_body_partition`, specializing directly
+  to `BodyPartitionWitness.toSuperPartition`.
 **What remains**:
 - Derive global correction cancellation (`hCorrectionZero`) from the super PU
   derivative identity.
 
 ### Priority 5: `partition_of_unity_exists` (BerezinIntegration.lean)
 **Status**: Done in assumption-driven form via `BodyPartitionWitness`:
-`partition_of_unity_exists` now constructs `SuperPartitionOfUnity` from explicit
-body partition data (no `sorry`).
+- Added canonical constructor `BodyPartitionWitness.toSuperPartition`.
+- Added explicit properties:
+  - `BodyPartitionWitness.toSuperPartition_functions`
+  - `BodyPartitionWitness.toSuperPartition_support_full`
+- `partition_of_unity_exists` now wraps this canonical constructor.
 **What remains**: derive `BodyPartitionWitness` automatically from pure
 paracompactness/atlas infrastructure (Mathlib `SmoothPartitionOfUnity` bridge).
 
@@ -168,6 +173,7 @@ Global partition layer
 hSuperSum (super partition identity: Σ ρ_α = 1 in common chart)
 hSupportFull (all coefficients vanish off support domains; currently assumed)
 hLift (lifted PU case: ρ_α = liftToSuper h_α)
+BodyPartitionWitness.toSuperPartition (canonical lifted PU construction)
 SatisfiesSuperCocycle
 BodyIntegral.IsLinear
   ├─> used in globalBerezinIntegral_independent_proper
@@ -185,6 +191,7 @@ d0Codim1_mulByFunction
   ├─> global_super_stokes_no_boundary_reduced (DONE; two bridge hypotheses eliminated)
   └─> global_super_stokes_no_boundary_more_reduced (DONE; exact-term bridge eliminated)
       └─> global_super_stokes_no_boundary_lift_partition (DONE; hSupportFull removed in lifted case)
+          └─> global_super_stokes_no_boundary_body_partition (DONE; canonical witness PU specialization)
 ```
 
 ---

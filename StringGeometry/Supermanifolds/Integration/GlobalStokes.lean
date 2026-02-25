@@ -780,6 +780,38 @@ theorem global_super_stokes_no_boundary_lift_partition {dim : SuperDimension}
   exact global_super_stokes_no_boundary_more_reduced M hp hq ν pu bodyIntegral
     hLinear hChangeOfVar hDivThm transitions hSuperSum hSupportFull hCorrectionZero
 
+/-- Global Stokes for the canonical partition built from a `BodyPartitionWitness`.
+
+    The lifted-form hypothesis `ρ_α = liftToSuper(h_α)` is discharged by
+    construction (`BodyPartitionWitness.toSuperPartition_functions`). -/
+theorem global_super_stokes_no_boundary_body_partition {dim : SuperDimension}
+    (M : Supermanifold dim) (hp : 0 < dim.even) (hq : 0 < dim.odd)
+    (ν : GlobalIntegralFormCodim1 M)
+    (bp : BodyPartitionWitness M)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
+    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (hDivThm : ∀ (α : bp.toSuperPartition.index) (F : Fin dim.even → SmoothFunction dim.even),
+      (∀ i x, x ∉ bp.toSuperPartition.supportDomains α → (F i).toFun x = 0) →
+      bodyIntegral (bodyDivergence F) (bp.toSuperPartition.supportDomains α) = 0)
+    (transitions : bp.toSuperPartition.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum bp.toSuperPartition.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ bp.toSuperPartition.index bp.toSuperPartition.finIndex) (fun α =>
+          composeEvalAt (bp.toSuperPartition.functions α) (transitions α) x) = 1)
+    (hCorrectionZero :
+      @Finset.sum bp.toSuperPartition.index ℝ _
+        (@Finset.univ bp.toSuperPartition.index bp.toSuperPartition.finIndex) (fun α =>
+          bodyIntegral
+            (berezinIntegralOdd
+              (wedgeEvenDeriv (bp.toSuperPartition.functions α)
+                (ν.localForms (bp.toSuperPartition.charts α))).coefficient)
+            (bp.toSuperPartition.supportDomains α)) = 0) :
+    globalBerezinIntegral M (globalExteriorDerivative ν) bp.toSuperPartition bodyIntegral = 0 := by
+  exact global_super_stokes_no_boundary_lift_partition M hp hq ν bp.toSuperPartition
+    bp.bodyFunctions bp.toSuperPartition_functions bodyIntegral hLinear hChangeOfVar
+    hDivThm transitions hSuperSum hCorrectionZero
+
 /-! ## Consequences -/
 
 /-- Cohomological consequence: exact integral forms integrate to zero.
