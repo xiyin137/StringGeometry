@@ -2418,7 +2418,7 @@ theorem SmoothFunction.extendToGrassmann_const {p q : ℕ} (c : ℝ)
     simp
   simp only [h, zero_smul, Finset.sum_const_zero, add_zero]
 
-/-- Full composition of SuperDomainFunctions.
+/-- Legacy approximate composition of SuperDomainFunctions.
 
     Given:
     - f : SuperDomainFunction p' q' (a function of intermediate coordinates (y, θ))
@@ -2427,12 +2427,15 @@ theorem SmoothFunction.extendToGrassmann_const {p q : ℕ} (c : ℝ)
 
     Returns f(g(x, φ), h(x, φ)) : SuperDomainFunction p q
 
-    This is the fundamental operation for proving the super chain rule.
+    This was an early approximation used while developing chain-rule infrastructure.
 
     **Note**: This definition uses a simplified approximation. The full
     composition formula involves Taylor expansion over the Grassmann algebra
-    and careful bookkeeping of multi-indices. -/
-noncomputable def SuperDomainFunction.compose {p p' q q' : ℕ}
+    and careful bookkeeping of multi-indices.
+
+    Prefer `SuperDomainFunction.composeProper` from
+    `Integration/SuperCompose.lean` for non-legacy proofs. -/
+noncomputable def SuperDomainFunction.composeLegacyApprox {p p' q q' : ℕ}
     (f : SuperDomainFunction p' q')
     (g : Fin p' → SuperDomainFunction p q)
     (h : Fin q' → SuperDomainFunction p q)
@@ -2475,6 +2478,17 @@ noncomputable def SuperDomainFunction.compose {p p' q q' : ℕ}
         exact contDiff_const
   }
 
+/-- Deprecated compatibility alias for the old approximate composition. -/
+@[deprecated SuperDomainFunction.composeLegacyApprox (since := "2026-02-25")]
+noncomputable abbrev SuperDomainFunction.compose {p p' q q' : ℕ}
+    (f : SuperDomainFunction p' q')
+    (g : Fin p' → SuperDomainFunction p q)
+    (h : Fin q' → SuperDomainFunction p q)
+    (hg_even : ∀ k, (g k).isEven)
+    (hh_odd : ∀ a, (h a).isOdd) :
+    SuperDomainFunction p q :=
+  SuperDomainFunction.composeLegacyApprox f g h hg_even hh_odd
+
 /-- For coordinate transitions that compose correctly, the chain rule holds.
 
     **Theorem Statement**: If transitions compose at the super level, then
@@ -2495,7 +2509,7 @@ theorem SuperTransition.chain_rule_holds {dim : SuperDimension} {M : Supermanifo
     -- Hypothesis: full super transitions compose (stronger condition)
     (hSuperCompose : ∀ (i : Fin dim.even) (x : Fin dim.even → ℝ),
         (t_αγ.evenTransition i).evalAtPoint x =
-        ((t_βγ.evenTransition i).compose
+        ((t_βγ.evenTransition i).composeLegacyApprox
           t_αβ.evenTransition t_αβ.oddTransition
           t_αβ.evenTransition_even t_αβ.oddTransition_odd).evalAtPoint x)
     (x : Fin dim.even → ℝ) :

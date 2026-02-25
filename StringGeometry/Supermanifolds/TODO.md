@@ -2,8 +2,8 @@
 
 ## Summary
 
-The algebraic foundations are well-developed and proven. The **global integration
-pipeline** has correct definitions and sound algebraic infrastructure.
+The algebraic foundations are substantial, with most local integration
+infrastructure formalized. Global assembly still has open proof obligations.
 
 **Post-audit status** (5 rounds of comprehensive audit + targeted fixes):
 - `BodyIntegral.SatisfiesChangeOfVar` — was vacuously strong, now properly parameterized
@@ -18,9 +18,12 @@ pipeline** has correct definitions and sound algebraic infrastructure.
 
 **What IS genuinely proven** (real theorems, not tautologies):
 - Local reduction: super Stokes → classical divergence theorem (via `d0_is_divergence`)
-- All algebraic infrastructure (Taylor, composition, pullback, Berezinian, partition normalization)
+- Core algebraic infrastructure used by the active pipeline (Taylor, composition,
+  pullback, Berezinian, partition normalization)
 - Berezinian cocycle from chain rule
 - `partialEven_mul`: product rule for ∂/∂xⁱ on Grassmann products
+
+**Current folder total**: 28 `sorry` occurrences (allowlisted and tracked).
 
 **What is NOT proven** (honest sorrys):
 - Global Berezin integral independent of PU choice
@@ -48,31 +51,34 @@ pipeline** has correct definitions and sound algebraic infrastructure.
 | Helpers/SuperMatrix.lean | SuperMatrix with block multiplication |
 | Helpers/Berezinian.lean | Berezinian computation, ber_congr |
 | Helpers/BerezinianMul.lean | `ber_mul` proven (2900+ lines) |
-| Helpers/FiniteGrassmann.lean | Ring instance, SuperCommutative, `grassmann_soul_nilpotent` proven |
-| Helpers/SuperChainRule.lean | `berezinian_cocycle_from_chain_rule` proven |
 | Helpers/PartialOddLeibniz.lean | Sign lemmas for Leibniz rule |
 | Helpers/GrassmannSmooth.lean | GrassmannSmooth predicate, all closure properties proven |
 | Helpers/NilpotentTaylor.lean | Full Taylor expansion, all proven (0 sorrys) |
 | Helpers/NilpotentInverse.lean | Geometric series inverse, bridge lemmas — all proven (0 sorrys) |
 | Integration/SuperCompose.lean | Super function composition — all proven (0 sorrys) |
 | Integration/IntegralFormCodim.lean | Codimension-1 integral forms, complete |
+| Integration/PartitionOfUnity.lean | All proven |
 | Integration/StokesTheorem.lean | Local Stokes via d0_is_divergence reduction (0 sorrys) |
 | Integration/Pullback.lean | pullbackProper, berezinianCarrierAt_grassmannSmooth — all proven (0 sorrys) |
 | Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence`, **`partialEven_mul`** (0 sorrys) |
 
-### Has Honest Sorrys (definitions correct, proofs pending)
+### Has Honest Sorrys (definitions mostly correct, proofs pending)
 | File | Sorrys | Notes |
 |------|--------|-------|
-| Integration/PartitionOfUnity.lean | 0 | All proven |
+| Helpers/FiniteGrassmann.lean | 3 | Legacy approximate composition (`composeLegacyApprox`) and downstream placeholder theorem |
+| Helpers/SuperChainRule.lean | 5 | Legacy full-cocycle-to-chain-rule bridge has pending proofs |
 | Integration/GlobalStokes.lean | 3 | `berezin_change_of_variables`, `globalBerezinIntegral_independent_proper`, `global_super_stokes_no_boundary` |
-| BerezinIntegration.lean | 3 | `berezin_change_of_variables_formula` (legacy), `partition_of_unity_exists`, `globalBerezinIntegral_independent` |
+| BerezinIntegration.lean | 4 | `pullbackLegacy`, `berezin_change_of_variables_formula_legacy`, `partition_of_unity_exists`, `globalBerezinIntegral_independent` |
+| Helpers/FormalPowerSeries.lean | 1 | Jacobi identity bridge step remains sorry |
+| FPS/LogExp.lean | 1 | Inverse identity bridge step remains sorry |
 
 ### Legacy/Tautological (marked, not counting as "proven")
 | File | Notes |
 |------|-------|
-| BerezinIntegration.lean: `super_stokes` | Hypothesis restates conclusion. Superseded by StokesTheorem.lean |
-| BerezinIntegration.lean: `super_divergence_theorem` | Proves `x = x` via rfl. Boundary integral not formalized |
-| BerezinIntegration.lean: `IntegralForm.pullback` | `⟨sorry⟩`. Superseded by `pullbackProper` in Pullback.lean |
+| BerezinIntegration.lean: `super_stokes_legacy` | Hypothesis restates conclusion. Superseded by StokesTheorem.lean |
+| BerezinIntegration.lean: `super_divergence_theorem_legacy` | Proves `x = x` via rfl. Boundary integral not formalized |
+| BerezinIntegration.lean: `IntegralForm.pullbackLegacy` | `⟨sorry⟩`. Superseded by `pullbackProper` in Pullback.lean |
+| Integration/Legacy.lean | Deprecated compatibility aliases for legacy names |
 
 ### Sorrys Independent of Integration Pipeline
 | File | Notes |

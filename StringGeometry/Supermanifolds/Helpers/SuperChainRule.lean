@@ -162,7 +162,7 @@ theorem body_chain_rule_from_cocycle {dim : SuperDimension} {M : Supermanifold d
     let J_βγ := Matrix.of (fun (i : Fin dim.even) (j : Fin dim.even) =>
         fderiv ℝ (t_βγ.evenTransition i).body (body_αβ x) (Pi.single j 1))
     let J_αβ := Matrix.of (fun (i : Fin dim.even) (j : Fin dim.even) =>
-        fderiv ℝ (t_αβ.evenTransition j).body x (Pi.single j 1))
+        fderiv ℝ (t_αβ.evenTransition i).body x (Pi.single j 1))
     -- The body Jacobians satisfy J_αγ = J_βγ * J_αβ
     -- This is proven in body_jacobian_cocycle in BerezinIntegration.lean
     J_αγ.det = J_βγ.det * J_αβ.det := by
@@ -177,7 +177,8 @@ theorem body_chain_rule_from_cocycle {dim : SuperDimension} {M : Supermanifold d
     - For even coords: t_αγ.evenTransition i = (t_βγ.evenTransition i) ∘ t_αβ
     - For odd coords: t_αγ.oddTransition a = (t_βγ.oddTransition a) ∘ t_αβ
 
-    where composition is in the sense of SuperDomainFunction.compose.
+    where composition is in the sense of the legacy approximation
+    `SuperDomainFunction.composeLegacyApprox`.
 
     This is a stronger condition than the body cocycle.
 
@@ -196,11 +197,11 @@ structure FullSuperCocycle {dim : SuperDimension} {M : Supermanifold dim}
   /-- Even coordinates compose correctly:
       (t_αγ.evenTransition i).evalAtPoint x I = (t_βγ.evenTransition i ∘ t_αβ).evalAtPoint x I
 
-      Here ∘ denotes SuperDomainFunction.compose, substituting the intermediate
+      Here ∘ denotes `SuperDomainFunction.composeLegacyApprox`, substituting the intermediate
       coordinates (y, η) = t_αβ(x, θ) into the function f_βγ^i(y, η). -/
   evenCompose : ∀ (i : Fin dim.even) (x : Fin dim.even → ℝ) (I : Finset (Fin dim.odd)),
       (t_αγ.evenTransition i).evalAtPoint x I =
-      ((t_βγ.evenTransition i).compose
+      ((t_βγ.evenTransition i).composeLegacyApprox
         t_αβ.evenTransition t_αβ.oddTransition
         t_αβ.evenTransition_even  -- This is exactly isEven for each component
         t_αβ.oddTransition_odd).evalAtPoint x I  -- This is exactly isOdd for each component
@@ -208,7 +209,7 @@ structure FullSuperCocycle {dim : SuperDimension} {M : Supermanifold dim}
       (t_αγ.oddTransition a).evalAtPoint x I = (t_βγ.oddTransition a ∘ t_αβ).evalAtPoint x I -/
   oddCompose : ∀ (a : Fin dim.odd) (x : Fin dim.even → ℝ) (I : Finset (Fin dim.odd)),
       (t_αγ.oddTransition a).evalAtPoint x I =
-      ((t_βγ.oddTransition a).compose
+      ((t_βγ.oddTransition a).composeLegacyApprox
         t_αβ.evenTransition t_αβ.oddTransition
         t_αβ.evenTransition_even
         t_αβ.oddTransition_odd).evalAtPoint x I

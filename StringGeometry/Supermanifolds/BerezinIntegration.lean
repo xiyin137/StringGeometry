@@ -252,7 +252,7 @@ theorem SuperTransition.toSuperCoordChange_jacobian_eq {dim : SuperDimension}
     t.toSuperCoordChange.jacobian = t.toSuperJacobian := by
   rfl
 
-/-- Pullback of an integral form under a coordinate change.
+/-- Legacy placeholder pullback of an integral form under a coordinate change.
 
     Under a super coordinate change φ: (x,θ) ↦ (x',θ'), an integral form transforms as:
       φ*[f(x',θ') Dx' Dθ'] = f(φ(x,θ)) · Ber(J_φ)(x,θ) · [Dx Dθ]
@@ -272,8 +272,10 @@ theorem SuperTransition.toSuperCoordChange_jacobian_eq {dim : SuperDimension}
     3. **Multiplication**: Multiply the composed function by the Berezinian.
 
     See Witten's notes (arXiv:1209.2199, eq. 3.10) for the transformation law.
-    Blocked on: super function composition (Phase 3 of integration plan). -/
-noncomputable def IntegralForm.pullback {p q : ℕ}
+    Blocked on: super function composition (Phase 3 of integration plan).
+
+    Use `Integration/Pullback.lean` (`pullbackProper`) for the active pipeline. -/
+noncomputable def IntegralForm.pullbackLegacy {p q : ℕ}
     (φ : SuperCoordChange p q) (ω : IntegralForm p q) : IntegralForm p q :=
   -- φ*ω = (ω.coefficient ∘ φ) · Ber(J_φ)
   -- Requires super function composition to compute ω.coefficient ∘ φ
@@ -389,24 +391,24 @@ structure BodyIntegral.SatisfiesChangeOfVar (p : ℕ)
       composed expression (which would need significant real analysis infrastructure). -/
   change_of_var : ∀ (U V : Set (Fin p → ℝ))
       (Φ : (Fin p → ℝ) → (Fin p → ℝ))
-      (hΦ : ContDiff ℝ ⊤ Φ)
-      (hBij : Set.BijOn Φ U V)
+      (_hΦ : ContDiff ℝ ⊤ Φ)
+      (_hBij : Set.BijOn Φ U V)
       (f : SmoothFunction p)
       -- The composed integrand, packaged as a SmoothFunction
       (fΦJ : SmoothFunction p)
       -- Pointwise equality: fΦJ(x) = f(Φ(x)) · det(DΦ(x))
-      (hfΦJ : ∀ x, fΦJ.toFun x = f.toFun (Φ x) *
+      (_hfΦJ : ∀ x, fΦJ.toFun x = f.toFun (Φ x) *
         (fderiv ℝ Φ x).det),
       bodyIntegral f V = bodyIntegral fΦJ U
 
-theorem berezin_change_of_variables_formula {p q : ℕ}
+theorem berezin_change_of_variables_formula_legacy {p q : ℕ}
     (U V : Set (Fin p → ℝ))
     (φ : SuperCoordChange p q)
     (hDiffeo : φ.IsDiffeoOn U V)
     (ω : IntegralForm p q)
     (bodyIntegral : SmoothFunction p → Set (Fin p → ℝ) → ℝ)
     (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar p bodyIntegral) :
-    localBerezinIntegral U (IntegralForm.pullback φ ω) bodyIntegral =
+    localBerezinIntegral U (IntegralForm.pullbackLegacy φ ω) bodyIntegral =
     localBerezinIntegral V ω bodyIntegral := by
   sorry
 
@@ -480,8 +482,8 @@ So if we integrate f(y,η) [Dy Dη]:
 --   For φ: (x,θ) ↦ (y,η) with Jacobian J = [A B; C D]:
 --     [Dy Dη] = Ber(J) · [Dx Dθ]
 --   From Witten's notes (arXiv:1209.2199, eq. 3.10).
---   This is encoded in the definition of IntegralForm.pullback:
---     pullback φ ω = ⟨(ω.coefficient ∘ φ) · Ber(J_φ)⟩
+--   This is encoded in the legacy placeholder definition `IntegralForm.pullbackLegacy`:
+--     pullbackLegacy φ ω = ⟨(ω.coefficient ∘ φ) · Ber(J_φ)⟩
 --
 -- Key theorems to prove (once composition infrastructure is available):
 --   pullback_identity: pullback id ω = ω
@@ -1154,7 +1156,7 @@ where Φ is the product of vertex operators.
     1. d₁ν integrates to 0 (no boundary in odd directions)
     2. d₀ν reduces to classical divergence on the body -/
 -- TAUTOLOGICAL: hypothesis restates conclusion. See StokesTheorem.lean for proper versions.
-theorem super_stokes {p q : ℕ} (_hp : 0 < p)
+theorem super_stokes_legacy {p q : ℕ} (_hp : 0 < p)
     (U : Set (Fin p → ℝ))
     (_hU_compact : IsCompact U)
     (_hU_open : IsOpen (interior U))
@@ -1316,7 +1318,7 @@ noncomputable def superDivergence {p q : ℕ} (X : SuperVectorField p q Parity.e
 
     For the actual content, see `Integration/StokesTheorem.lean` which properly
     reduces super Stokes to the classical divergence theorem on the body. -/
-theorem super_divergence_theorem {p q : ℕ}
+theorem super_divergence_theorem_legacy {p q : ℕ}
     (X : SuperVectorField p q Parity.even)
     (_U : Set (Fin p → ℝ))    -- Region in the body
     (_bdryU : Set (Fin (p - 1) → ℝ))  -- Boundary

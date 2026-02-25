@@ -60,7 +60,7 @@ Defines supermanifolds as ringed spaces with ℤ/2-graded structure sheaves. Key
 
 - **Algebraic foundations**: Finite Grassmann algebra (`FiniteGrassmannCarrier q = Finset (Fin q) -> R`) with Ring instance and Koszul sign convention. Even subalgebra (`FiniteGrassmannEven q`) as CommRing. SuperCommutative graded algebra structure.
 - **Berezinian**: Superdeterminant `Ber(M) = det(A - BD^{-1}C) / det(D)` with multiplicativity (`ber_mul`, 2900+ lines), cocycle property via super chain rule, LDU/UDL factorizations.
-- **Integration pipeline** (Phases 1-8): Full nilpotent Taylor expansion, super function composition via Taylor, pullback of integral forms with Berezinian, nilpotent inverse via geometric series, super partition of unity, change of variables, coordinate independence, and **global Stokes theorem** on closed supermanifolds. Only 4 sorrys remain (1 smoothness, 3 assembly).
+- **Integration pipeline** (Phases 1-8): Full nilpotent Taylor expansion, super function composition via Taylor, pullback of integral forms with Berezinian, nilpotent inverse via geometric series, super partition of unity, change of variables, coordinate independence, and **global Stokes theorem** on closed supermanifolds. Core local infrastructure is formalized; global assembly theorems still contain explicit `sorry` placeholders (tracked in `StringGeometry/Supermanifolds/TODO.md`).
 - **Other**: Batchelor theorem (stated), formal power series, super Jacobian, partial odd derivations.
 
 ### Super Riemann Surfaces

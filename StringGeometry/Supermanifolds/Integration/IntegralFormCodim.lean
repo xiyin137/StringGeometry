@@ -1,4 +1,4 @@
-import StringGeometry.Supermanifolds.BerezinIntegration
+import StringGeometry.Supermanifolds.Integration.Core
 
 /-!
 # Codimension-1 Integral Forms on Super Domains

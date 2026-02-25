@@ -4,7 +4,7 @@ Released under Apache 2.0 license.
 -/
 import StringGeometry.Supermanifolds.Helpers.NilpotentTaylor
 import StringGeometry.Supermanifolds.Helpers.GrassmannSmooth
-import StringGeometry.Supermanifolds.BerezinIntegration
+import StringGeometry.Supermanifolds.Integration.Core
 
 /-!
 # Super Function Composition
@@ -313,15 +313,16 @@ theorem composeEvalAt_smul {p q : ℕ}
 
 /-! ## Connection to the Existing Placeholder
 
-The old `SuperDomainFunction.compose` in FiniteGrassmann.lean is a placeholder that
+The old `SuperDomainFunction.composeLegacyApprox` in FiniteGrassmann.lean is a placeholder that
 only handles the body coefficient correctly (and returns 0 for all non-body coefficients).
 
 `composeProper` replaces this with the full computation using nilpotent Taylor expansion.
 The two agree on the body coefficient when restricted to body-only composition:
-`composeProper.coefficients ∅ x ≈ compose.coefficients ∅ x` (to first order in soul parts).
+`composeProper.coefficients ∅ x ≈ composeLegacyApprox.coefficients ∅ x`
+(to first order in soul parts).
 
 For the global integration pipeline:
-- Phase 3 (IntegralForm.pullback) uses `composeEvalAt` to compute ω ∘ φ at each point
+- Phase 3 (`IntegralForm.pullbackProper`) uses `composeEvalAt` to compute ω ∘ φ at each point
 - Phase 6 (change of variables) needs `composeProper` for the full coefficient computation
 -/
 
