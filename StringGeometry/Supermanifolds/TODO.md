@@ -123,9 +123,9 @@ infrastructure formalized. Global assembly still has open proof obligations.
   from `hDivThm` plus full coefficient support vanishing (`hSupportFull`).
 - Added `global_super_stokes_no_boundary_more_reduced`, which now derives
   `hExactZero` internally.
+- Added `global_super_stokes_no_boundary_lift_partition`, which derives
+  `hSupportFull` automatically from `hLift : ρ_α = liftToSuper(h_α)`.
 **What remains**:
-- Derive `hSupportFull` automatically from the PU construction (rather than
-  assuming it).
 - Derive global correction cancellation (`hCorrectionZero`) from the super PU
   derivative identity.
 
@@ -167,10 +167,12 @@ Global partition layer
 ----------------------
 hSuperSum (super partition identity: Σ ρ_α = 1 in common chart)
 hSupportFull (all coefficients vanish off support domains; currently assumed)
+hLift (lifted PU case: ρ_α = liftToSuper h_α)
 SatisfiesSuperCocycle
 BodyIntegral.IsLinear
   ├─> used in globalBerezinIntegral_independent_proper
   ├─> used in global_super_stokes_no_boundary_more_reduced (exact-term derivation)
+  ├─> support_full_of_lift_partition (DONE)
   └─> correction-term cancellation in global_super_stokes_no_boundary (still TODO to derive)
 
 Final theorem
@@ -182,6 +184,7 @@ d0Codim1_mulByFunction
   ├─> global_super_stokes_no_boundary (DONE via bridge hypotheses)
   ├─> global_super_stokes_no_boundary_reduced (DONE; two bridge hypotheses eliminated)
   └─> global_super_stokes_no_boundary_more_reduced (DONE; exact-term bridge eliminated)
+      └─> global_super_stokes_no_boundary_lift_partition (DONE; hSupportFull removed in lifted case)
 ```
 
 ---

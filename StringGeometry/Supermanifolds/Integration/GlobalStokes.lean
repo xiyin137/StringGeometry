@@ -730,6 +730,56 @@ theorem global_super_stokes_no_boundary_more_reduced {dim : SuperDimension}
   exact global_super_stokes_no_boundary_reduced M hp hq ν pu bodyIntegral hLinear hChangeOfVar
     hDivThm transitions hSuperSum hExactZero hCorrectionZero
 
+/-- For lifted partitions (`ρ_α = liftToSuper h_α`), coefficient-level support
+    vanishing follows from body support plus θ-independence. -/
+private theorem support_full_of_lift_partition {dim : SuperDimension}
+    {M : Supermanifold dim}
+    (pu : SuperPartitionOfUnity M)
+    (bodyFunctions : pu.index → SmoothFunction dim.even)
+    (hLift : ∀ α, pu.functions α = liftToSuper (bodyFunctions α)) :
+    ∀ α I x, x ∉ pu.supportDomains α → (pu.functions α).coefficients I x = 0 := by
+  intro α I x hx
+  by_cases hI : I = ∅
+  · subst hI
+    simpa [SuperDomainFunction.body] using pu.support_subset α x hx
+  · rw [hLift α, liftToSuper, SuperDomainFunction.ofSmooth]
+    simp [hI]
+
+/-- Global Stokes specialization for lifted partitions of unity.
+
+    This discharges `hSupportFull` automatically from `hLift`, so the only
+    remaining external cancellation input is the global correction-term sum. -/
+theorem global_super_stokes_no_boundary_lift_partition {dim : SuperDimension}
+    (M : Supermanifold dim) (hp : 0 < dim.even) (hq : 0 < dim.odd)
+    (ν : GlobalIntegralFormCodim1 M)
+    (pu : SuperPartitionOfUnity M)
+    (bodyFunctions : pu.index → SmoothFunction dim.even)
+    (hLift : ∀ α, pu.functions α = liftToSuper (bodyFunctions α))
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
+    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
+      (∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0) →
+      bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0)
+    (transitions : pu.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ pu.index pu.finIndex) (fun α =>
+          composeEvalAt (pu.functions α) (transitions α) x) = 1)
+    (hCorrectionZero :
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex) (fun α =>
+        bodyIntegral
+          (berezinIntegralOdd
+            (wedgeEvenDeriv (pu.functions α)
+              (ν.localForms (pu.charts α))).coefficient)
+          (pu.supportDomains α)) = 0) :
+    globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral = 0 := by
+  have hSupportFull :
+      ∀ α I x, x ∉ pu.supportDomains α → (pu.functions α).coefficients I x = 0 :=
+    support_full_of_lift_partition pu bodyFunctions hLift
+  exact global_super_stokes_no_boundary_more_reduced M hp hq ν pu bodyIntegral
+    hLinear hChangeOfVar hDivThm transitions hSuperSum hSupportFull hCorrectionZero
+
 /-! ## Consequences -/
 
 /-- Cohomological consequence: exact integral forms integrate to zero.
