@@ -70,3 +70,21 @@ Worldsheet geometry for superstrings: super Riemann surfaces, superconformal map
 ### Topology
 
 Infrastructure for homotopy theory (pointed spaces, suspensions, loop spaces, weak equivalences, exact sequences), Čech cohomology of sheaves, and stable homotopy theory (spectra, Eilenberg-MacLane spectra, homotopy groups).
+
+## Repository Factorization
+
+The repo now includes a concrete split workflow for separating:
+
+- `Supermanifolds` (independent repo)
+- `RiemannSurfaces` (includes `StringGeometry/Topology` sheaf infrastructure)
+- `SuperRiemannSurfaces` (depends on the two repos above)
+
+Run:
+
+```bash
+./scripts/factorization/extract_all_component_repos.sh
+```
+
+See full GitHub migration steps in:
+
+- `docs/factorization/github-factorization-runbook.md`
