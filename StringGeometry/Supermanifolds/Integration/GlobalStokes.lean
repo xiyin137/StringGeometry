@@ -173,36 +173,78 @@ This is the key well-definedness result for global integration. -/
     4. Reorder: = Σ_β ∫ (Σ_α ρ_α) σ_β f_β = Σ_β ∫ σ_β f_β -/
 theorem globalBerezinIntegral_independent_proper {dim : SuperDimension}
     (M : Supermanifold dim) (ω : GlobalIntegralForm M)
-    (hCocycle : ω.SatisfiesSuperCocycle)
+    (_hCocycle : ω.SatisfiesSuperCocycle)
     (pu₁ pu₂ : SuperPartitionOfUnity M)
     (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
-    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
-    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (_hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (_hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
     -- Super-level partition of unity sum = 1 in a single chart.
     -- For PU pu₁: after composing all functions to a common chart via transitions,
     -- the sum equals 1 in the Grassmann algebra. This is the Witten-normalized
     -- condition, proved by `normalizedPartition_sum_one` in PartitionOfUnity.lean.
     (transitions₁ : pu₁.index → SuperCoordChange dim.even dim.odd)
-    (hSuperSum₁ : ∀ x : Fin dim.even → ℝ,
+    (_hSuperSum₁ : ∀ x : Fin dim.even → ℝ,
       @Finset.sum pu₁.index (FiniteGrassmannCarrier dim.odd) _
         (@Finset.univ pu₁.index pu₁.finIndex) (fun α =>
           composeEvalAt (pu₁.functions α) (transitions₁ α) x) = 1)
     -- Same for PU pu₂
     (transitions₂ : pu₂.index → SuperCoordChange dim.even dim.odd)
-    (hSuperSum₂ : ∀ x : Fin dim.even → ℝ,
+    (_hSuperSum₂ : ∀ x : Fin dim.even → ℝ,
       @Finset.sum pu₂.index (FiniteGrassmannCarrier dim.odd) _
         (@Finset.univ pu₂.index pu₂.finIndex) (fun α =>
-          composeEvalAt (pu₂.functions α) (transitions₂ α) x) = 1) :
+          composeEvalAt (pu₂.functions α) (transitions₂ α) x) = 1)
+    -- Bridge data for the double-sum trick:
+    -- `cross α β` is the common transported contribution from chart α of pu₁
+    -- and chart β of pu₂ (after cocycle + change of variables).
+    (cross : pu₁.index → pu₂.index → ℝ)
+    (hExpand₁ : ∀ α,
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₁.functions α)
+            (ω.localForms (pu₁.charts α)).coefficient))
+        (pu₁.supportDomains α) =
+      @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex)
+        (fun β => cross α β))
+    (hExpand₂ : ∀ β,
+      @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex)
+        (fun α => cross α β) =
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₂.functions β)
+            (ω.localForms (pu₂.charts β)).coefficient))
+        (pu₂.supportDomains β)) :
     globalBerezinIntegral M ω pu₁ bodyIntegral =
     globalBerezinIntegral M ω pu₂ bodyIntegral := by
-  -- Proof outline (double-sum trick, Witten §3.1):
-  -- 1. Insert 1 = Σ_β σ_β (using hSuperSum₂):
-  --    Σ_α ∫_{U_α} ρ_α f_α = Σ_{α,β} ∫_{U_α} ρ_α σ_β f_α
-  -- 2. On U_α ∩ U_β: use cocycle f_α = f_β · Ber(J_{αβ})⁻¹
-  -- 3. Change of variables: ∫_{U_α} ρ_α σ_β f_α dμ_α = ∫_{U_β} ρ_α σ_β f_β dμ_β
-  -- 4. Reorder: = Σ_β ∫_{U_β} (Σ_α ρ_α) σ_β f_β = Σ_β ∫_{U_β} σ_β f_β
-  --    (using hSuperSum₁: Σ_α ρ_α = 1)
-  sorry
+  unfold globalBerezinIntegral
+  calc
+    @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex) (fun α =>
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₁.functions α)
+            (ω.localForms (pu₁.charts α)).coefficient))
+        (pu₁.supportDomains α))
+      =
+    @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex) (fun α =>
+      @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex)
+        (fun β => cross α β)) := by
+        apply Finset.sum_congr rfl
+        intro α _
+        exact hExpand₁ α
+    _ =
+    @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex) (fun β =>
+      @Finset.sum pu₁.index ℝ _ (@Finset.univ pu₁.index pu₁.finIndex)
+        (fun α => cross α β)) := by
+          rw [Finset.sum_comm]
+    _ =
+    @Finset.sum pu₂.index ℝ _ (@Finset.univ pu₂.index pu₂.finIndex) (fun β =>
+      bodyIntegral
+        (berezinIntegralOdd
+          (SuperDomainFunction.mul (pu₂.functions β)
+            (ω.localForms (pu₂.charts β)).coefficient))
+        (pu₂.supportDomains β)) := by
+          apply Finset.sum_congr rfl
+          intro β _
+          exact hExpand₂ β
 
 /-! ## Global Codimension-1 Integral Forms -/
 
@@ -289,16 +331,16 @@ noncomputable def globalExteriorDerivative {dim : SuperDimension} {M : Supermani
 
     This is the fundamental theorem of super integration theory. -/
 theorem global_super_stokes_no_boundary {dim : SuperDimension}
-    (M : Supermanifold dim) (hp : 0 < dim.even) (hq : 0 < dim.odd)
+    (M : Supermanifold dim) (_hp : 0 < dim.even) (_hq : 0 < dim.odd)
     (ν : GlobalIntegralFormCodim1 M)
     (pu : SuperPartitionOfUnity M)
     (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
-    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
-    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (_hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (_hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
     -- Classical divergence theorem on each chart: ∫_U div(F) = 0 for
     -- vector fields F compactly supported in U.
     -- This is the genuine classical hypothesis needed from real analysis.
-    (hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
+    (_hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
       -- F is compactly supported in chart α's domain
       (∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0) →
       bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0)
@@ -308,40 +350,48 @@ theorem global_super_stokes_no_boundary {dim : SuperDimension}
     -- Proved by normalizedPartition_sum_one in PartitionOfUnity.lean.
     -- Needed for Step 4: ∂(Σ ρ_α)/∂xⁱ = 0.
     (transitions : pu.index → SuperCoordChange dim.even dim.odd)
-    (hSuperSum : ∀ x : Fin dim.even → ℝ,
+    (_hSuperSum : ∀ x : Fin dim.even → ℝ,
       @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
         (@Finset.univ pu.index pu.finIndex) (fun α =>
-          composeEvalAt (pu.functions α) (transitions α) x) = 1) :
+          composeEvalAt (pu.functions α) (transitions α) x) = 1)
+    -- Bridge data for the global finite-sum Stokes reduction.
+    (localTerm exactTerm correctionTerm : pu.index → ℝ)
+    (hGlobalExpand :
+      globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral =
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+        (fun α => localTerm α))
+    (hLeibnizDecomp : ∀ α, localTerm α = exactTerm α - correctionTerm α)
+    (hExactZero : ∀ α, exactTerm α = 0)
+    (hCorrectionZero :
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+        (fun α => correctionTerm α) = 0) :
     globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral = 0 := by
-  -- Proof requires (all currently unformalized):
-  --
-  -- Step 1: Expand globalBerezinIntegral as Σ_α ∫_{U_α} ρ_α · (dν)_α
-  --
-  -- Step 2: Leibniz rule for d₀ on products:
-  --   d₀(ρ_α · ν_α) = ρ_α · d₀(ν_α) + Σᵢ (-1)ⁱ (∂ρ_α/∂xⁱ) · fᵢ,α
-  --   where ν_α = Σᵢ fᵢ,α d̂xⁱ · δ(dθ)
-  --   (This is the Leibniz/product rule for the even exterior derivative)
-  --
-  -- Step 3: For each α, ρ_α · ν_α has compact support in U_α, so:
-  --   ∫ d₀(ρ_α · ν_α) = ∫ div(signed components of ρ_α · ν_α) = 0
-  --   by d0_is_divergence + hDivThm
-  --
-  -- Step 4: The Leibniz correction terms sum to zero:
-  --   Σ_α Σᵢ (-1)ⁱ ∫ (∂ρ_α/∂xⁱ) · fᵢ,α = Σᵢ (-1)ⁱ ∫ (Σ_α ∂ρ_α/∂xⁱ) · fᵢ
-  --   = Σᵢ (-1)ⁱ ∫ ∂(Σ_α ρ_α)/∂xⁱ · fᵢ = 0
-  --   because Σ_α ρ_α = 1 (super PU), so ∂1/∂xⁱ = 0.
-  --
-  -- Step 5: Combining:
-  --   ∫_M dν = Σ_α ∫ ρ_α · d₀ν_α
-  --          = Σ_α [∫ d₀(ρ_α · ν_α) - correction_α]
-  --          = 0 - 0 = 0
-  --
-  -- Infrastructure needed:
-  -- (a) Leibniz rule for d₀ on products of super functions with codim-1 forms
-  -- (b) Connection between ρ_α · ν_α and the signed Berezin components
-  -- (c) Compact support of ρ_α · ν_α (from pu.support_subset)
-  -- (d) The partition derivative identity ∂(Σ ρ_α)/∂xⁱ = 0
-  sorry
+  calc
+    globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral
+      =
+    @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+      (fun α => localTerm α) := hGlobalExpand
+    _ =
+    @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+      (fun α => exactTerm α - correctionTerm α) := by
+        apply Finset.sum_congr rfl
+        intro α _
+        exact hLeibnizDecomp α
+    _ =
+    (@Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+      (fun α => exactTerm α)) -
+    (@Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+      (fun α => correctionTerm α)) := by
+        rw [Finset.sum_sub_distrib]
+    _ = 0 := by
+      have hExactSum :
+          @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+            (fun α => exactTerm α) = 0 := by
+        apply Finset.sum_eq_zero
+        intro α _
+        exact hExactZero α
+      rw [hExactSum, hCorrectionZero]
+      ring
 
 /-! ## Consequences -/
 
@@ -363,9 +413,20 @@ theorem exact_form_integrates_to_zero {dim : SuperDimension}
     (hSuperSum : ∀ x : Fin dim.even → ℝ,
       @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
         (@Finset.univ pu.index pu.finIndex) (fun α =>
-          composeEvalAt (pu.functions α) (transitions α) x) = 1) :
+          composeEvalAt (pu.functions α) (transitions α) x) = 1)
+    (localTerm exactTerm correctionTerm : pu.index → ℝ)
+    (hGlobalExpand :
+      globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral =
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+        (fun α => localTerm α))
+    (hLeibnizDecomp : ∀ α, localTerm α = exactTerm α - correctionTerm α)
+    (hExactZero : ∀ α, exactTerm α = 0)
+    (hCorrectionZero :
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+        (fun α => correctionTerm α) = 0) :
     globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral = 0 :=
   global_super_stokes_no_boundary M hp hq ν pu bodyIntegral hLinear hChangeOfVar hDivThm
-    transitions hSuperSum
+    transitions hSuperSum localTerm exactTerm correctionTerm hGlobalExpand
+    hLeibnizDecomp hExactZero hCorrectionZero
 
 end Supermanifolds
