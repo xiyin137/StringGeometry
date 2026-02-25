@@ -1224,9 +1224,10 @@ structure SuperTransition {dim : SuperDimension} {M : Supermanifold dim}
     (oddTransition a).coefficients I = 0
   /-- The body map (x-components evaluated at θ=0) is a diffeomorphism -/
   bodyTransition_diffeo : ContDiff ℝ ⊤ (fun x => (fun i => (evenTransition i).body x))
-  /-- The body transition is invertible -/
+  /-- The body transition has a smooth two-sided inverse. -/
   bodyTransition_inv : ∃ (g : (Fin dim.even → ℝ) → (Fin dim.even → ℝ)),
     (∀ x, g ((fun i => (evenTransition i).body x)) = x) ∧
+    (∀ y, (fun i => (evenTransition i).body (g y)) = y) ∧
     ContDiff ℝ ⊤ g
 
 /-- A super atlas on M is a collection of charts covering M_red with
