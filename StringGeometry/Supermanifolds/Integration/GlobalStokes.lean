@@ -559,6 +559,62 @@ private theorem local_leibniz_decomp_bodyIntegral {dim : SuperDimension}
       _ = exactVal - correctionVal := by rw [hExactExpand]
   simpa [ρ, να, U, localVal, exactVal, correctionVal, hLocalDef] using hLocalEq
 
+/-- If all coefficients of `ρ` vanish at `x`, then all coefficients of `ρ * f`
+    vanish at `x`. -/
+private theorem mul_coeff_apply_zero_left {p q : ℕ}
+    (ρ f : SuperDomainFunction p q)
+    (x : Fin p → ℝ)
+    (hρ : ∀ I : Finset (Fin q), (ρ.coefficients I).toFun x = 0)
+    (K : Finset (Fin q)) :
+    ((ρ * f).coefficients K).toFun x = 0 := by
+  change ((SuperDomainFunction.mul ρ f).coefficients K).toFun x = 0
+  unfold SuperDomainFunction.mul
+  simp [SmoothFunction.smul_apply, SmoothFunction.mul_apply, hρ]
+
+/-- Exact-term vanishing derived from divergence theorem plus full support vanishing
+    of partition functions (all Grassmann coefficients vanish off support domains). -/
+private theorem exact_term_zero_from_divergence {dim : SuperDimension}
+    {M : Supermanifold dim}
+    (ν : GlobalIntegralFormCodim1 M)
+    (pu : SuperPartitionOfUnity M)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
+    (hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
+      (∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0) →
+      bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0)
+    (hSupportFull : ∀ α I x,
+      x ∉ pu.supportDomains α → (pu.functions α).coefficients I x = 0) :
+    ∀ α,
+      bodyIntegral
+        (berezinIntegralOdd
+          (superExteriorDerivativeCodim1
+            (IntegralFormCodim1.mulByFunction (pu.functions α)
+              (ν.localForms (pu.charts α)))).coefficient)
+        (pu.supportDomains α) = 0 := by
+  intro α
+  let να : IntegralFormCodim1 dim.even dim.odd :=
+    IntegralFormCodim1.mulByFunction (pu.functions α) (ν.localForms (pu.charts α))
+  let F : Fin dim.even → SmoothFunction dim.even := signedBerezinComponents να
+  have hFsupport : ∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0 := by
+    intro i x hx
+    have hρx : ∀ I : Finset (Fin dim.odd),
+        (pu.functions α).coefficients I x = 0 := fun I => hSupportFull α I x hx
+    have hTopZero :
+        berezinIntegralOdd (((ν.localForms (pu.charts α)).components i |> (fun fi =>
+          (pu.functions α) * fi))) x = 0 := by
+      change (((pu.functions α) * (ν.localForms (pu.charts α)).components i).coefficients
+        (Finset.univ : Finset (Fin dim.odd))).toFun x = 0
+      simpa using mul_coeff_apply_zero_left (ρ := pu.functions α)
+        (f := (ν.localForms (pu.charts α)).components i) (x := x) hρx Finset.univ
+    have hTopZero' :
+        berezinIntegralOdd (να.components i) x = 0 := by
+      simpa [να, IntegralFormCodim1.mulByFunction] using hTopZero
+    simp [F, signedBerezinComponents, hTopZero']
+  have hDivZero : bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0 :=
+    hDivThm α F hFsupport
+  have hd0 : berezinIntegralOdd (superExteriorDerivativeCodim1 να).coefficient = bodyDivergence F := by
+    simpa [superExteriorDerivativeCodim1_eq_d0, F] using d0_is_divergence να
+  simpa [να, hd0] using hDivZero
+
 /-- Global Stokes with derived chartwise Leibniz decomposition.
 
     This removes the bridge hypotheses `hGlobalExpand` and `hLeibnizDecomp` by
@@ -632,6 +688,47 @@ theorem global_super_stokes_no_boundary_reduced {dim : SuperDimension}
   exact global_super_stokes_no_boundary M hp hq ν pu bodyIntegral hLinear hChangeOfVar
     hDivThm transitions hSuperSum localTerm exactTerm correctionTerm hGlobalExpand
     hLeibnizDecomp hExactZero' hCorrectionZero'
+
+/-- Global Stokes with both chartwise Leibniz decomposition and exact-term vanishing
+    derived internally.
+
+    Remaining external cancellation input is only the global correction-term sum. -/
+theorem global_super_stokes_no_boundary_more_reduced {dim : SuperDimension}
+    (M : Supermanifold dim) (hp : 0 < dim.even) (hq : 0 < dim.odd)
+    (ν : GlobalIntegralFormCodim1 M)
+    (pu : SuperPartitionOfUnity M)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
+    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
+      (∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0) →
+      bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0)
+    (transitions : pu.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ pu.index pu.finIndex) (fun α =>
+          composeEvalAt (pu.functions α) (transitions α) x) = 1)
+    (hSupportFull : ∀ α I x,
+      x ∉ pu.supportDomains α → (pu.functions α).coefficients I x = 0)
+    (hCorrectionZero :
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex) (fun α =>
+        bodyIntegral
+          (berezinIntegralOdd
+            (wedgeEvenDeriv (pu.functions α)
+              (ν.localForms (pu.charts α))).coefficient)
+          (pu.supportDomains α)) = 0) :
+    globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral = 0 := by
+  have hExactZero :
+      ∀ α,
+        bodyIntegral
+          (berezinIntegralOdd
+            (superExteriorDerivativeCodim1
+              (IntegralFormCodim1.mulByFunction (pu.functions α)
+                (ν.localForms (pu.charts α)))).coefficient)
+          (pu.supportDomains α) = 0 :=
+    exact_term_zero_from_divergence ν pu bodyIntegral hDivThm hSupportFull
+  exact global_super_stokes_no_boundary_reduced M hp hq ν pu bodyIntegral hLinear hChangeOfVar
+    hDivThm transitions hSuperSum hExactZero hCorrectionZero
 
 /-! ## Consequences -/
 

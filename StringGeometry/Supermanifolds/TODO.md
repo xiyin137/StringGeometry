@@ -27,13 +27,17 @@ infrastructure formalized. Global assembly still has open proof obligations.
 
 **What is NOT yet derived from local infrastructure**:
 - Bridge hypotheses for global PU independence (double-sum transport expansions)
-- Bridge hypotheses for global Stokes finite-sum decomposition
+- Global correction-term cancellation from the PU derivative identity
+  (`d(Σ ρ_α) = 0`) in the super setting
+- Full coefficient-level support vanishing for generic super partitions of unity
 - Super PU witness extraction from pure paracompactness/atlas data
 - Body-level pullback identity needed by CoV bridge (now in explicit finite-sum form)
 
 **Recently completed**:
 - Leibniz rule for d₀ on products: `d0Codim1_mulByFunction`
   (proved in `Integration/ExteriorDerivative.lean`)
+- Exact-term vanishing from divergence + support:
+  `exact_term_zero_from_divergence` (GlobalStokes.lean)
 
 ---
 
@@ -61,7 +65,7 @@ infrastructure formalized. Global assembly still has open proof obligations.
 | Integration/StokesTheorem.lean | Local Stokes via d0_is_divergence reduction (0 sorrys) |
 | Integration/Pullback.lean | pullbackProper, berezinianCarrierAt_grassmannSmooth — all proven (0 sorrys) |
 | Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence`, `partialEven_mul`, `d0Codim1_mulByFunction` (0 sorrys) |
-| Integration/GlobalStokes.lean | Placeholder-free: `berezin_change_of_variables` proved; global theorems now use explicit bridge hypotheses |
+| Integration/GlobalStokes.lean | Placeholder-free; includes `global_super_stokes_no_boundary_more_reduced` with internally derived exact-term vanishing |
 | BerezinIntegration.lean | Legacy placeholders removed; existence/uniqueness are now explicit assumption-driven interfaces |
 
 ### Has Honest Sorrys (definitions mostly correct, proofs pending)
@@ -115,11 +119,15 @@ infrastructure formalized. Global assembly still has open proof obligations.
 - Added `global_super_stokes_no_boundary_reduced` in `GlobalStokes.lean`.
 - This new theorem derives `hGlobalExpand` and `hLeibnizDecomp` internally from
   definitions + `d0Codim1_mulByFunction` + body-integral linearity.
-- Remaining assumptions are now only the genuinely analytic/global cancellations:
-  chartwise exact-term vanishing (`hExactZero`) and global correction cancellation
-  (`hCorrectionZero`).
-**What remains**: Derive `hExactZero` from local Stokes/divergence support and derive
-`hCorrectionZero` from PU derivative cancellation.
+- Added `exact_term_zero_from_divergence`, deriving chartwise exact-term vanishing
+  from `hDivThm` plus full coefficient support vanishing (`hSupportFull`).
+- Added `global_super_stokes_no_boundary_more_reduced`, which now derives
+  `hExactZero` internally.
+**What remains**:
+- Derive `hSupportFull` automatically from the PU construction (rather than
+  assuming it).
+- Derive global correction cancellation (`hCorrectionZero`) from the super PU
+  derivative identity.
 
 ### Priority 5: `partition_of_unity_exists` (BerezinIntegration.lean)
 **Status**: Done in assumption-driven form via `BodyPartitionWitness`:
@@ -144,7 +152,7 @@ Local integration layer
 d0_is_divergence
 super_stokes_codim1_no_boundary (StokesTheorem.lean)
 hDivThm (classical divergence theorem hypothesis)
-  └─> local chartwise vanishing of exact terms
+  └─> exact_term_zero_from_divergence (DONE, under hSupportFull)
 
 Global change-of-variables layer
 --------------------------------
@@ -158,10 +166,12 @@ pullbackEvalAt + berezinianCarrierAt + BodyIntegral.SatisfiesChangeOfVar
 Global partition layer
 ----------------------
 hSuperSum (super partition identity: Σ ρ_α = 1 in common chart)
+hSupportFull (all coefficients vanish off support domains; currently assumed)
 SatisfiesSuperCocycle
 BodyIntegral.IsLinear
   ├─> used in globalBerezinIntegral_independent_proper
-  └─> correction-term cancellation in global_super_stokes_no_boundary
+  ├─> used in global_super_stokes_no_boundary_more_reduced (exact-term derivation)
+  └─> correction-term cancellation in global_super_stokes_no_boundary (still TODO to derive)
 
 Final theorem
 -------------
@@ -170,7 +180,8 @@ d0Codim1_mulByFunction
 + super_stokes_codim1_no_boundary / hDivThm
 + hSuperSum cancellation
   ├─> global_super_stokes_no_boundary (DONE via bridge hypotheses)
-  └─> global_super_stokes_no_boundary_reduced (DONE; two bridge hypotheses eliminated)
+  ├─> global_super_stokes_no_boundary_reduced (DONE; two bridge hypotheses eliminated)
+  └─> global_super_stokes_no_boundary_more_reduced (DONE; exact-term bridge eliminated)
 ```
 
 ---
