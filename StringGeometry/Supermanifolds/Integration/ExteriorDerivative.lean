@@ -331,6 +331,139 @@ noncomputable def d0Codim1 {p q : ℕ} (ν : IntegralFormCodim1 p q) : IntegralF
     Finset.univ.sum fun (i : Fin p) =>
       ((-1 : ℝ) ^ (i : ℕ)) • (partialEven i (ν.components i)).coefficients I⟩⟩
 
+/-! ## Leibniz Rule for d₀ on Products -/
+
+/-- Wedge term in the Leibniz rule for d₀.
+
+    If ν = Σᵢ fᵢ d̂xⁱ·δ(dθ), then:
+      d₀ρ ∧ ν = Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · fᵢ [Dx Dθ]. -/
+noncomputable def wedgeEvenDeriv {p q : ℕ} (ρ : SuperDomainFunction p q)
+    (ν : IntegralFormCodim1 p q) : IntegralForm p q :=
+  ⟨⟨fun K =>
+    Finset.univ.sum fun (i : Fin p) =>
+      ((-1 : ℝ) ^ (i : ℕ)) • ((partialEven i ρ) * (ν.components i)).coefficients K⟩⟩
+
+private theorem sum_signed_partialEven_coeff {p q : ℕ} (ν : IntegralFormCodim1 p q)
+    (I : Finset (Fin q)) :
+    (Finset.univ.sum fun i : Fin p => ((-1 : ℝ) ^ (i : ℕ)) • partialEven i (ν.components i)).coefficients I =
+    Finset.univ.sum fun i : Fin p => ((-1 : ℝ) ^ (i : ℕ)) • (partialEven i (ν.components i)).coefficients I := by
+  induction (Finset.univ : Finset (Fin p)) using Finset.induction_on with
+  | empty => simp
+  | insert a s ha ih =>
+      simp [Finset.sum_insert, ha, ih, SuperDomainFunction.add_coefficients]
+      rfl
+
+private theorem super_sum_coeff_apply {p q : ℕ} {ι : Type*} [DecidableEq ι]
+    (s : Finset ι) (f : ι → SuperDomainFunction p q)
+    (I : Finset (Fin q)) (x : Fin p → ℝ) :
+    ((s.sum f).coefficients I).toFun x = s.sum (fun a => ((f a).coefficients I).toFun x) := by
+  induction s using Finset.induction_on with
+  | empty => simp
+  | insert a s ha ih =>
+      simp [Finset.sum_insert, ha, ih, SuperDomainFunction.add_coefficients, SmoothFunction.add_apply]
+
+/-- Leibniz rule for d₀ on products of a super function with a codimension-1 integral form.
+
+    d₀(ρ · ν) = ρ · d₀ν + (d₀ρ ∧ ν). -/
+theorem d0Codim1_mulByFunction {p q : ℕ} (ρ : SuperDomainFunction p q)
+    (ν : IntegralFormCodim1 p q) :
+    d0Codim1 (IntegralFormCodim1.mulByFunction ρ ν) =
+    IntegralForm.mulByFunction ρ (d0Codim1 ν) + wedgeEvenDeriv ρ ν := by
+  have hcoeff :
+      (d0Codim1 (IntegralFormCodim1.mulByFunction ρ ν)).coefficient =
+      (IntegralForm.mulByFunction ρ (d0Codim1 ν) + wedgeEvenDeriv ρ ν).coefficient := by
+    apply SuperDomainFunction.ext
+    intro I
+    apply SmoothFunction.ext
+    intro x
+    have hadd_coeff (ω₁ ω₂ : IntegralForm p q) :
+        ((ω₁ + ω₂).coefficient.coefficients I).toFun x =
+          (ω₁.coefficient.coefficients I).toFun x + (ω₂.coefficient.coefficients I).toFun x := rfl
+    have hmulBy_coeff (f : SuperDomainFunction p q) (ω : IntegralForm p q) :
+        ((IntegralForm.mulByFunction f ω).coefficient.coefficients I).toFun x =
+          ((f * ω.coefficient).coefficients I).toFun x := rfl
+    rw [hadd_coeff (IntegralForm.mulByFunction ρ (d0Codim1 ν)) (wedgeEvenDeriv ρ ν)]
+    rw [hmulBy_coeff ρ (d0Codim1 ν)]
+    simp [d0Codim1, IntegralFormCodim1.mulByFunction, wedgeEvenDeriv]
+    have hExpand :
+        (∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) * ((partialEven i (ρ.mul (ν.components i))).coefficients I).toFun x)
+          =
+        (∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) *
+          (((partialEven i ρ * ν.components i + ρ * partialEven i (ν.components i)).coefficients I).toFun x)) := by
+      apply Finset.sum_congr rfl
+      intro i _
+      have hmul :
+          partialEven i (ρ.mul (ν.components i)) =
+          partialEven i ρ * ν.components i + ρ * partialEven i (ν.components i) := by
+        simpa [HMul.hMul, Mul.mul] using
+          (partialEven_mul (i := i) (f := ρ) (g := ν.components i))
+      rw [hmul]
+    rw [hExpand]
+    simp_rw [SuperDomainFunction.add_coefficients, SmoothFunction.add_apply]
+    have hdist :
+        (∑ i : Fin p,
+            ((-1 : ℝ) ^ (i : ℕ)) *
+              (((partialEven i ρ * ν.components i).coefficients I).toFun x +
+                ((ρ * partialEven i (ν.components i)).coefficients I).toFun x))
+          =
+        (∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) * ((partialEven i ρ * ν.components i).coefficients I).toFun x)
+          +
+        (∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) * ((ρ * partialEven i (ν.components i)).coefficients I).toFun x) := by
+      calc
+        (∑ i : Fin p,
+            ((-1 : ℝ) ^ (i : ℕ)) *
+              (((partialEven i ρ * ν.components i).coefficients I).toFun x +
+                ((ρ * partialEven i (ν.components i)).coefficients I).toFun x))
+            =
+          (∑ i : Fin p,
+            (((-1 : ℝ) ^ (i : ℕ)) * ((partialEven i ρ * ν.components i).coefficients I).toFun x +
+             ((-1 : ℝ) ^ (i : ℕ)) * ((ρ * partialEven i (ν.components i)).coefficients I).toFun x)) := by
+              apply Finset.sum_congr rfl
+              intro i _
+              ring
+        _ =
+          (∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) * ((partialEven i ρ * ν.components i).coefficients I).toFun x)
+            +
+          (∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) * ((ρ * partialEven i (ν.components i)).coefficients I).toFun x) :=
+            Finset.sum_add_distrib
+    rw [hdist]
+    have hsumSF :
+        ({ coefficients := fun J =>
+            ∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) • (partialEven i (ν.components i)).coefficients J } :
+          SuperDomainFunction p q)
+        =
+        (Finset.univ.sum fun i : Fin p => ((-1 : ℝ) ^ (i : ℕ)) • partialEven i (ν.components i)) := by
+      apply SuperDomainFunction.ext
+      intro J
+      simpa using (sum_signed_partialEven_coeff (ν := ν) (I := J)).symm
+    have hprod' :
+        ((ρ * { coefficients := fun J =>
+            ∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) • (partialEven i (ν.components i)).coefficients J }).coefficients I).toFun x
+        =
+        (∑ i : Fin p, ((-1 : ℝ) ^ (i : ℕ)) * ((ρ * partialEven i (ν.components i)).coefficients I).toFun x) := by
+      rw [hsumSF]
+      rw [Finset.mul_sum]
+      rw [super_sum_coeff_apply (s := Finset.univ)
+        (f := fun i : Fin p => ρ * (((-1 : ℝ) ^ (i : ℕ)) • partialEven i (ν.components i)))
+        (I := I) (x := x)]
+      apply Finset.sum_congr rfl
+      intro i _
+      have hmul_smul :
+          ρ * (((-1 : ℝ) ^ (i : ℕ)) • partialEven i (ν.components i)) =
+            ((-1 : ℝ) ^ (i : ℕ)) • (ρ * partialEven i (ν.components i)) := by
+        simpa using
+          (mul_smul_comm ρ (partialEven i (ν.components i)) (((-1 : ℝ) ^ (i : ℕ))))
+      rw [hmul_smul]
+      rfl
+    rw [hprod']
+    ring
+  cases hL : d0Codim1 (IntegralFormCodim1.mulByFunction ρ ν) with
+  | mk a =>
+    cases hR : (IntegralForm.mulByFunction ρ (d0Codim1 ν) + wedgeEvenDeriv ρ ν) with
+    | mk b =>
+      simp [hL, hR] at hcoeff
+      simpa [hL, hR] using hcoeff
+
 /-!
 ## Super Exterior Derivative on Integral Forms
 
