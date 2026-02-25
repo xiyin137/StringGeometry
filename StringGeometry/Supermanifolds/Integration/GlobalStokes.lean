@@ -430,6 +430,209 @@ theorem global_super_stokes_no_boundary {dim : SuperDimension}
       rw [hExactSum, hCorrectionZero]
       ring
 
+/-- Local Leibniz decomposition for each chart contribution in global Stokes.
+
+    This derives the chartwise identity
+      local = exact - correction
+    from `d0Codim1_mulByFunction` and linearity of the body integral. -/
+private theorem local_leibniz_decomp_bodyIntegral {dim : SuperDimension}
+    {M : Supermanifold dim}
+    (ν : GlobalIntegralFormCodim1 M)
+    (pu : SuperPartitionOfUnity M)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
+    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (α : pu.index) :
+    bodyIntegral
+      (berezinIntegralOdd
+        (SuperDomainFunction.mul (pu.functions α)
+          (superExteriorDerivativeCodim1 (ν.localForms (pu.charts α))).coefficient))
+      (pu.supportDomains α)
+    =
+    bodyIntegral
+      (berezinIntegralOdd
+        (superExteriorDerivativeCodim1
+          (IntegralFormCodim1.mulByFunction (pu.functions α)
+            (ν.localForms (pu.charts α)))).coefficient)
+      (pu.supportDomains α)
+    -
+    bodyIntegral
+      (berezinIntegralOdd
+        (wedgeEvenDeriv (pu.functions α) (ν.localForms (pu.charts α))).coefficient)
+      (pu.supportDomains α) := by
+  let ρ := pu.functions α
+  let να := ν.localForms (pu.charts α)
+  let U := pu.supportDomains α
+  let localVal : ℝ :=
+    bodyIntegral
+      (berezinIntegralOdd
+        (SuperDomainFunction.mul ρ (superExteriorDerivativeCodim1 να).coefficient))
+      U
+  let exactVal : ℝ :=
+    bodyIntegral
+      (berezinIntegralOdd
+        (superExteriorDerivativeCodim1 (IntegralFormCodim1.mulByFunction ρ να)).coefficient)
+      U
+  let correctionVal : ℝ :=
+    bodyIntegral
+      (berezinIntegralOdd (wedgeEvenDeriv ρ να).coefficient)
+      U
+  have hLeibz :
+      superExteriorDerivativeCodim1 (IntegralFormCodim1.mulByFunction ρ να) =
+      IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να) + wedgeEvenDeriv ρ να := by
+    simpa [superExteriorDerivativeCodim1_eq_d0] using d0Codim1_mulByFunction ρ να
+  have hTop :
+      berezinIntegralOdd
+        (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να) + wedgeEvenDeriv ρ να).coefficient
+      =
+      berezinIntegralOdd (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient
+      +
+      berezinIntegralOdd (wedgeEvenDeriv ρ να).coefficient := by
+    apply SmoothFunction.ext
+    intro x
+    -- `berezinIntegralOdd_add` is stated for SuperDomainFunction, and the
+    -- coefficient of an integral-form sum is the SuperDomainFunction sum.
+    change berezinIntegralOdd
+      (SuperDomainFunction.add
+        (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient
+        (wedgeEvenDeriv ρ να).coefficient) x
+      =
+      (berezinIntegralOdd (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient) x
+      +
+      (berezinIntegralOdd (wedgeEvenDeriv ρ να).coefficient) x
+    simpa using
+      congrArg (fun f => f x)
+        (berezinIntegralOdd_add
+          (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient
+          (wedgeEvenDeriv ρ να).coefficient)
+  have hPush :
+      bodyIntegral
+        (berezinIntegralOdd
+          (superExteriorDerivativeCodim1 (IntegralFormCodim1.mulByFunction ρ να)).coefficient)
+        U
+      =
+      bodyIntegral
+        (berezinIntegralOdd
+          (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να) + wedgeEvenDeriv ρ να).coefficient)
+        U := by
+    exact congrArg (fun ω => bodyIntegral (berezinIntegralOdd ω.coefficient) U) hLeibz
+  have hExactExpand : exactVal = localVal + correctionVal := by
+    unfold exactVal localVal correctionVal U
+    calc
+      bodyIntegral
+          (berezinIntegralOdd
+            (superExteriorDerivativeCodim1 (IntegralFormCodim1.mulByFunction ρ να)).coefficient)
+          (pu.supportDomains α)
+        =
+      bodyIntegral
+          (berezinIntegralOdd
+            (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να) + wedgeEvenDeriv ρ να).coefficient)
+          (pu.supportDomains α) := by
+            exact hPush
+      _ =
+      bodyIntegral
+          (berezinIntegralOdd (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient
+            + berezinIntegralOdd (wedgeEvenDeriv ρ να).coefficient)
+          (pu.supportDomains α) := by
+            rw [hTop]
+      _ =
+      bodyIntegral
+          (berezinIntegralOdd (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient)
+          (pu.supportDomains α)
+        +
+      bodyIntegral
+          (berezinIntegralOdd (wedgeEvenDeriv ρ να).coefficient)
+          (pu.supportDomains α) := by
+            exact hLinear.add (pu.supportDomains α)
+              (berezinIntegralOdd (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient)
+              (berezinIntegralOdd (wedgeEvenDeriv ρ να).coefficient)
+  have hLocalDef :
+      localVal =
+      bodyIntegral
+        (berezinIntegralOdd
+          (IntegralForm.mulByFunction ρ (superExteriorDerivativeCodim1 να)).coefficient)
+        U := by
+    rfl
+  have hLocalEq :
+      localVal = exactVal - correctionVal := by
+    calc
+      localVal = (localVal + correctionVal) - correctionVal := by ring
+      _ = exactVal - correctionVal := by rw [hExactExpand]
+  simpa [ρ, να, U, localVal, exactVal, correctionVal, hLocalDef] using hLocalEq
+
+/-- Global Stokes with derived chartwise Leibniz decomposition.
+
+    This removes the bridge hypotheses `hGlobalExpand` and `hLeibnizDecomp` by
+    deriving them from definitions and `d0Codim1_mulByFunction`. -/
+theorem global_super_stokes_no_boundary_reduced {dim : SuperDimension}
+    (M : Supermanifold dim) (hp : 0 < dim.even) (hq : 0 < dim.odd)
+    (ν : GlobalIntegralFormCodim1 M)
+    (pu : SuperPartitionOfUnity M)
+    (bodyIntegral : SmoothFunction dim.even → Set (Fin dim.even → ℝ) → ℝ)
+    (hLinear : BodyIntegral.IsLinear dim.even bodyIntegral)
+    (hChangeOfVar : BodyIntegral.SatisfiesChangeOfVar dim.even bodyIntegral)
+    (hDivThm : ∀ (α : pu.index) (F : Fin dim.even → SmoothFunction dim.even),
+      (∀ i x, x ∉ pu.supportDomains α → (F i).toFun x = 0) →
+      bodyIntegral (bodyDivergence F) (pu.supportDomains α) = 0)
+    (transitions : pu.index → SuperCoordChange dim.even dim.odd)
+    (hSuperSum : ∀ x : Fin dim.even → ℝ,
+      @Finset.sum pu.index (FiniteGrassmannCarrier dim.odd) _
+        (@Finset.univ pu.index pu.finIndex) (fun α =>
+          composeEvalAt (pu.functions α) (transitions α) x) = 1)
+    (hExactZero : ∀ α,
+      bodyIntegral
+        (berezinIntegralOdd
+          (superExteriorDerivativeCodim1
+            (IntegralFormCodim1.mulByFunction (pu.functions α)
+              (ν.localForms (pu.charts α)))).coefficient)
+        (pu.supportDomains α) = 0)
+    (hCorrectionZero :
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex) (fun α =>
+        bodyIntegral
+          (berezinIntegralOdd
+            (wedgeEvenDeriv (pu.functions α)
+              (ν.localForms (pu.charts α))).coefficient)
+          (pu.supportDomains α)) = 0) :
+    globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral = 0 := by
+  let localTerm : pu.index → ℝ := fun α =>
+    bodyIntegral
+      (berezinIntegralOdd
+        (SuperDomainFunction.mul (pu.functions α)
+          (superExteriorDerivativeCodim1 (ν.localForms (pu.charts α))).coefficient))
+      (pu.supportDomains α)
+  let exactTerm : pu.index → ℝ := fun α =>
+    bodyIntegral
+      (berezinIntegralOdd
+        (superExteriorDerivativeCodim1
+          (IntegralFormCodim1.mulByFunction (pu.functions α)
+            (ν.localForms (pu.charts α)))).coefficient)
+      (pu.supportDomains α)
+  let correctionTerm : pu.index → ℝ := fun α =>
+    bodyIntegral
+      (berezinIntegralOdd
+        (wedgeEvenDeriv (pu.functions α)
+          (ν.localForms (pu.charts α))).coefficient)
+      (pu.supportDomains α)
+  have hGlobalExpand :
+      globalBerezinIntegral M (globalExteriorDerivative ν) pu bodyIntegral =
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+        (fun α => localTerm α) := by
+    unfold globalBerezinIntegral localTerm
+    rfl
+  have hLeibnizDecomp : ∀ α, localTerm α = exactTerm α - correctionTerm α := by
+    intro α
+    simpa [localTerm, exactTerm, correctionTerm] using
+      local_leibniz_decomp_bodyIntegral ν pu bodyIntegral hLinear α
+  have hExactZero' : ∀ α, exactTerm α = 0 := by
+    intro α
+    simpa [exactTerm] using hExactZero α
+  have hCorrectionZero' :
+      @Finset.sum pu.index ℝ _ (@Finset.univ pu.index pu.finIndex)
+        (fun α => correctionTerm α) = 0 := by
+    simpa [correctionTerm] using hCorrectionZero
+  exact global_super_stokes_no_boundary M hp hq ν pu bodyIntegral hLinear hChangeOfVar
+    hDivThm transitions hSuperSum localTerm exactTerm correctionTerm hGlobalExpand
+    hLeibnizDecomp hExactZero' hCorrectionZero'
+
 /-! ## Consequences -/
 
 /-- Cohomological consequence: exact integral forms integrate to zero.

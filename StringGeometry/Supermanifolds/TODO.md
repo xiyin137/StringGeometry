@@ -111,9 +111,15 @@ infrastructure formalized. Global assembly still has open proof obligations.
 **What remains**: Derive those hypotheses from cocycle + CoV + PU machinery.
 
 ### Priority 4: Discharge Bridge Hypotheses for `global_super_stokes_no_boundary`
-**Status**: The theorem is now proved from explicit finite-sum bridge hypotheses
-(`hGlobalExpand`, `hLeibnizDecomp`, `hExactZero`, `hCorrectionZero`).
-**What remains**: Derive these bridges from local Stokes + Leibniz + PU derivative cancellation.
+**Status**:
+- Added `global_super_stokes_no_boundary_reduced` in `GlobalStokes.lean`.
+- This new theorem derives `hGlobalExpand` and `hLeibnizDecomp` internally from
+  definitions + `d0Codim1_mulByFunction` + body-integral linearity.
+- Remaining assumptions are now only the genuinely analytic/global cancellations:
+  chartwise exact-term vanishing (`hExactZero`) and global correction cancellation
+  (`hCorrectionZero`).
+**What remains**: Derive `hExactZero` from local Stokes/divergence support and derive
+`hCorrectionZero` from PU derivative cancellation.
 
 ### Priority 5: `partition_of_unity_exists` (BerezinIntegration.lean)
 **Status**: Done in assumption-driven form via `BodyPartitionWitness`:
@@ -163,7 +169,8 @@ d0Codim1_mulByFunction
 + d0_is_divergence
 + super_stokes_codim1_no_boundary / hDivThm
 + hSuperSum cancellation
-  └─> global_super_stokes_no_boundary (DONE via bridge hypotheses; TODO to derive bridges)
+  ├─> global_super_stokes_no_boundary (DONE via bridge hypotheses)
+  └─> global_super_stokes_no_boundary_reduced (DONE; two bridge hypotheses eliminated)
 ```
 
 ---
