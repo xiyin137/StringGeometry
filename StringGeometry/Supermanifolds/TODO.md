@@ -31,9 +31,9 @@ infrastructure formalized. Global assembly still has open proof obligations.
 - Super PU exists from body PU + Mathlib paracompactness
 - Berezin change of variables (super pullback → body-level CoV)
 
-**What is IN PROGRESS**:
-- Leibniz rule for d₀ on products: d₀(ρ · ν) = ρ · d₀ν + correction
-  (uses `partialEven_mul` + Ring/Algebra structure on SuperDomainFunction)
+**Recently completed**:
+- Leibniz rule for d₀ on products: `d0Codim1_mulByFunction`
+  (proved in `Integration/ExteriorDerivative.lean`)
 
 ---
 
@@ -60,7 +60,7 @@ infrastructure formalized. Global assembly still has open proof obligations.
 | Integration/PartitionOfUnity.lean | All proven |
 | Integration/StokesTheorem.lean | Local Stokes via d0_is_divergence reduction (0 sorrys) |
 | Integration/Pullback.lean | pullbackProper, berezinianCarrierAt_grassmannSmooth — all proven (0 sorrys) |
-| Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence`, **`partialEven_mul`** (0 sorrys) |
+| Integration/ExteriorDerivative.lean | d₀, linearity, `d0_is_divergence`, `partialEven_mul`, `d0Codim1_mulByFunction` (0 sorrys) |
 
 ### Has Honest Sorrys (definitions mostly correct, proofs pending)
 | File | Sorrys | Notes |
@@ -89,12 +89,10 @@ infrastructure formalized. Global assembly still has open proof obligations.
 
 ## Remaining Work (Integration Pipeline)
 
-### Priority 1: Leibniz Rule for d₀ on Products — IN PROGRESS
-**What**: Formalize d₀(ρ · ν) = ρ · d₀ν + Σᵢ (-1)ⁱ (∂ρ/∂xⁱ) · fᵢ
-**Why**: Needed for global Stokes (to decompose ρ_α · dν into d(ρ_α · ν) minus correction).
-**How**: Uses `partialEven_mul` (proven) + Ring/Algebra distributivity on SuperDomainFunction
-(`mul_sum`, `smul_mul_assoc` from SuperDomainAlgebra.lean instances).
-**File**: Integration/ExteriorDerivative.lean
+### Priority 1: Leibniz Rule for d₀ on Products — DONE
+**Result**: `d0Codim1_mulByFunction` and `wedgeEvenDeriv` are now formalized in
+`Integration/ExteriorDerivative.lean`.
+**Use**: This is the key algebraic decomposition step for the global Stokes proof.
 
 ### Priority 2: Prove `berezin_change_of_variables` (GlobalStokes.lean)
 **What**: Show `∫_U φ*(ω) = ∫_V ω` using the corrected `SatisfiesChangeOfVar`.
@@ -123,6 +121,47 @@ via `superPartitionFromBody`.
 
 ---
 
+## Dependency Flowchart (Global Stokes)
+
+```text
+Local algebraic derivative layer
+--------------------------------
+partialEven_mul
+  └─> d0Codim1_mulByFunction (DONE)
+        └─> Leibniz decomposition for chart terms: d0(ρ·ν) = ρ·d0(ν) + correction
+
+Local integration layer
+-----------------------
+d0_is_divergence
+super_stokes_codim1_no_boundary (StokesTheorem.lean)
+hDivThm (classical divergence theorem hypothesis)
+  └─> local chartwise vanishing of exact terms
+
+Global change-of-variables layer
+--------------------------------
+pullbackEvalAt + berezinianCarrierAt + BodyIntegral.SatisfiesChangeOfVar
+  └─> berezin_change_of_variables (TODO, GlobalStokes.lean)
+        └─> globalBerezinIntegral_independent_proper (TODO, GlobalStokes.lean)
+
+Global partition layer
+----------------------
+hSuperSum (super partition identity: Σ ρ_α = 1 in common chart)
+SatisfiesSuperCocycle
+BodyIntegral.IsLinear
+  ├─> used in globalBerezinIntegral_independent_proper
+  └─> correction-term cancellation in global_super_stokes_no_boundary
+
+Final theorem
+-------------
+d0Codim1_mulByFunction
++ d0_is_divergence
++ super_stokes_codim1_no_boundary / hDivThm
++ hSuperSum cancellation
+  └─> global_super_stokes_no_boundary (TODO, GlobalStokes.lean)
+```
+
+---
+
 ## Key Proven Infrastructure (Reusable)
 
 | Component | File | Used By |
@@ -145,6 +184,7 @@ via `superPartitionFromBody`.
 | `berezinian_cocycle_from_chain_rule` | SuperChainRule.lean | Phase 7 |
 | `d0_is_divergence` | ExteriorDerivative.lean | Local Stokes reduction |
 | `partialEven_mul` | ExteriorDerivative.lean | Leibniz rule for d₀ |
+| `d0Codim1_mulByFunction` | ExteriorDerivative.lean | Global Stokes decomposition step |
 | Local Stokes (2 theorems) | StokesTheorem.lean | Global Stokes |
 
 ---
