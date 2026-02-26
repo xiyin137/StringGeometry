@@ -13,7 +13,7 @@ require SGRiemannSurfaces from git
   "https://github.com/xiyin137/stringgeometry-riemann-surfaces.git" @ "ab1b034"
 
 require SGSuperRiemannSurfaces from git
-  "https://github.com/xiyin137/stringgeometry-super-riemann-surfaces.git" @ "b79f1ce"
+  "https://github.com/xiyin137/stringgeometry-super-riemann-surfaces.git" @ "eea54e7"
 
 lean_lib StringGeometry where
   roots := #[`StringGeometry]
