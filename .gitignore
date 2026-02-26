@@ -18,9 +18,11 @@ lake-manifest.json
 
 # References
 /references/
+/_split_repos/
 
 # Claude
 .claude/settings.local.json
 CLAUDE.md
 .claude/CLAUDE.md
 agent.md
+claudereview.md

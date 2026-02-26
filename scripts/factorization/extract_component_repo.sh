@@ -49,7 +49,6 @@ case "$COMPONENT" in
     COPY_PATHS=(
       "StringGeometry/Supermanifolds"
       "StringGeometry/Supermanifolds.lean"
-      "scripts/check_supermanifolds_quality.sh"
     )
     EXTRA_DEPS=""
     ;;
@@ -101,6 +100,8 @@ for p in "${COPY_PATHS[@]}"; do
     cp "$ROOT_DIR/$p" "$OUT_DIR/$p"
   else
     echo "Missing path for $COMPONENT: $p" >&2
+    echo "This usually means the repository has already been refactored into umbrella mode." >&2
+    echo "Use the split repositories on GitHub as source-of-truth instead of re-extracting from this checkout." >&2
     exit 1
   fi
 done
@@ -124,9 +125,8 @@ cat > "$OUT_DIR/.github/workflows/lean-ci.yml" <<'EOF_CI'
 name: lean-ci
 
 on:
-  push:
-    branches: ["main"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -139,6 +139,12 @@ jobs:
       - name: Build
         run: lake build
 EOF_CI
+
+if command -v lake >/dev/null 2>&1; then
+  if ! (cd "$OUT_DIR" && lake update >/dev/null); then
+    echo "Warning: lake update failed for $OUT_DIR; run 'lake update' manually." >&2
+  fi
+fi
 
 cat > "$OUT_DIR/README.md" <<EOF_README
 # $REPO_LABEL

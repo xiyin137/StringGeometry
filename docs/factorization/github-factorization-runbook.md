@@ -41,7 +41,15 @@ Each output contains:
 - `lean-toolchain`
 - Component source subtree(s)
 - `lakefile.lean`
+- `lake-manifest.json` (auto-generated if `lake` is available during extraction)
 - `.github/workflows/lean-ci.yml`
+
+Workflow defaults in extracted repos:
+
+- `pull_request`
+- `workflow_dispatch`
+
+(`push` is intentionally disabled by default to avoid noisy CI mail on every main-branch commit.)
 
 ## GitHub Creation and Push
 
@@ -70,11 +78,15 @@ After foundation updates:
 2. Update dependency refs in `stringgeometry-super-riemann-surfaces/lakefile.lean`
 3. Commit manifest update (`lake update` + `lake-manifest.json`)
 
-## Optional Umbrella Repo
+## Umbrella Repo (Current State)
 
-You can keep current monorepo as an umbrella integration repo that only:
+This repository has been converted into an umbrella integration repo that:
 
-- pins dependency versions
-- aggregates docs and cross-module CI
+- pins component dependency versions
+- aggregates docs, references, and migration tooling
 
-If you do that, migrate to `lakefile.lean` with git dependencies instead of hosting all source trees.
+Source-of-truth Lean development lives in:
+
+- `xiyin137/stringgeometry-supermanifolds`
+- `xiyin137/stringgeometry-riemann-surfaces`
+- `xiyin137/stringgeometry-super-riemann-surfaces`
