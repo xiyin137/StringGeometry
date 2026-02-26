@@ -1,34 +1,79 @@
 # StringGeometry (Umbrella Repo)
 
-This repository is now an integration umbrella for the split component repos:
+`StringGeometry` is an integration umbrella around three active Lean repositories:
 
 - https://github.com/xiyin137/stringgeometry-supermanifolds
 - https://github.com/xiyin137/stringgeometry-riemann-surfaces
 - https://github.com/xiyin137/stringgeometry-super-riemann-surfaces
 
-It keeps cross-cutting documentation, references, and factorization tooling, while source-of-truth Lean development lives in the three component repositories.
+This repo is intentionally thin: it pins versions, aggregates top-level imports, and stores shared documentation/tooling for the split architecture.
 
-## Local Build
+## Architecture
+
+### Component responsibilities
+
+- `stringgeometry-supermanifolds`
+  - Foundational supergeometry infrastructure.
+- `stringgeometry-riemann-surfaces`
+  - Riemann surface development (analytic, scheme-theoretic, GAGA) plus shared sheaf topology infrastructure.
+- `stringgeometry-super-riemann-surfaces`
+  - Super Riemann surface layer built on both foundations above.
+
+### Dependency graph
+
+```text
+SGSupermanifolds
+SGRiemannSurfaces
+SGSuperRiemannSurfaces -> SGSupermanifolds, SGRiemannSurfaces
+```
+
+In this umbrella repo, these are pinned as git dependencies in `lakefile.lean`.
+
+## What Lives Here
+
+### Source and package wiring
+
+- `StringGeometry.lean`
+  - Umbrella entry point importing the three component libraries.
+- `lakefile.lean`
+  - Dependency pins for component repos.
+- `lean-toolchain`
+  - Lean toolchain version for integration builds.
+
+### Documentation and migration tooling
+
+- `docs/factorization/github-factorization-runbook.md`
+  - End-to-end split/factorization runbook and architecture notes.
+- `scripts/factorization/`
+  - Extraction scripts used during monorepo factorization.
+
+### Local work areas
+
+- `_split_repos/`
+  - Local export/scratch area for split repos (ignored by git).
+- `references/`
+  - Local reference material (ignored by git).
+
+## Build and Check
+
+From repo root:
 
 ```bash
 lake update
 lake build
 ```
 
-The umbrella package imports the component modules through git dependencies pinned in `lakefile.lean`.
+This validates that the pinned component revisions integrate correctly.
 
-## Module Entry Point
+## Workflow
 
-- `StringGeometry.lean` aggregates the main imports used across the project.
-
-## Migration Notes
-
-Factorization artifacts are retained as historical documentation:
-
-- `docs/factorization/github-factorization-runbook.md`
-- `scripts/factorization/*` (archival; these expect the pre-split monorepo source tree)
+1. Make theory/code changes in the relevant component repo.
+2. Push and verify CI in that component repo.
+3. Update commit pins in this repo's `lakefile.lean`.
+4. Run `lake update` and commit `lake-manifest.json`.
+5. Run `lake build` here to confirm cross-repo integration.
 
 ## Notes
 
-- Lean namespace remains `StringGeometry.*` across component repos to avoid import churn.
-- `_split_repos/` is ignored locally as an export/work area.
+- Namespace remains `StringGeometry.*` across component repos to keep imports stable.
+- Source-of-truth mathematical development is in the component repos, not in this umbrella repo.
